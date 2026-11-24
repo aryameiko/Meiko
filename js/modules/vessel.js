@@ -170,7 +170,7 @@
   /** Map marker HTML for the own ship. heading: degrees true or null. */
   function markerHTML(v, heading) {
     if (heading != null && isFinite(heading)) return '<div class="vsl-mk-rot" style="transform:rotate(' + Math.round(heading) + 'deg)">' + top(v.type, v) + '</div>';
-    return '<div class="vsl-mk-badge">' + side(v.type, v, { noWater: true }) + '</div>';
+    return '<div class="vsl-mk-side">' + side(v.type, v, { noWater: true }) + '</div>';
   }
 
   /** Dashboard block. */

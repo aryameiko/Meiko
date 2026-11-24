@@ -564,10 +564,11 @@ svg.i.rot-up { transform: rotate(-90deg); } svg.i.rot-down { transform: rotate(9
 .vsl-plate b { display: block; font-size: 22px; font-weight: 800; letter-spacing: .04em; }
 .vsl-plate small { color: var(--muted); }
 .vsl-mk { background: none; border: 0; }
-.vsl-mk-rot { width: 100%; height: 100%; transform-origin: 50% 50%; filter: drop-shadow(0 1px 2px rgba(0,0,0,.5)); }
+/* Own-ship marker: the vessel alone, no box; a dark outline + shadow keeps it bold on any map. */
+.vsl-mk-rot { width: 100%; height: 100%; transform-origin: 50% 50%; filter: drop-shadow(0 0 1px #061427) drop-shadow(0 0 1px #061427) drop-shadow(0 2px 3px rgba(0,0,0,.45)); }
 .vsl-mk-rot svg { width: 100%; height: 100%; display: block; }
-.vsl-mk-badge { width: 100%; height: 100%; background: #fff; border: 2px solid #2F6FED; border-radius: 10px; padding: 1px 3px; box-shadow: 0 1px 4px rgba(0,0,0,.35); }
-.vsl-mk-badge svg { width: 100%; height: 100%; }
+.vsl-mk-side { width: 100%; height: 100%; filter: drop-shadow(0 0 1px #061427) drop-shadow(0 0 1px #061427) drop-shadow(0 0 .5px #061427) drop-shadow(0 3px 3px rgba(0,0,0,.4)); }
+.vsl-mk-side svg { width: 100%; height: 100%; display: block; overflow: visible; }
 
 /* ---------- Live navigation panel ---------- */
 .live-panel { border-top: 1px solid var(--border); padding: 12px; }

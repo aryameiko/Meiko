@@ -178,7 +178,7 @@
       if (!v || !v.showOnMap) return dot(L, 'mk-gps', '', 18);
       var moving = f.speed == null || f.speed > 0.5; // m/s; heading is meaningless when stopped
       var hdg = f.heading != null && isFinite(f.heading) && moving ? f.heading : null;
-      return L.divIcon({ className: 'mk vsl-mk', html: MEIKO.vessel.markerHTML(v, hdg), iconSize: hdg != null ? [28, 56] : [52, 32], iconAnchor: hdg != null ? [14, 28] : [26, 16] });
+      return L.divIcon({ className: 'mk vsl-mk', html: MEIKO.vessel.markerHTML(v, hdg), iconSize: hdg != null ? [34, 68] : [76, 46], iconAnchor: hdg != null ? [17, 34] : [38, 39] });
     }
     function showFix(f, fly) {
       var ll = [f.lat, f.lon];
