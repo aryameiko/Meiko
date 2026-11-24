@@ -4,7 +4,7 @@
  */
 (function () {
   'use strict';
-  MEIKO.VERSION = '1.9.7';
+  MEIKO.VERSION = '1.9.8';
   var ui = MEIKO.ui, F = MEIKO.features, icon = ui.icon, C = window.MeikoCore;
   var view = ui.$('#view'), cleanup = null, clockTimer = null, deferredInstall = null;
 

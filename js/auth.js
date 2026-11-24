@@ -34,7 +34,8 @@
       'auth/too-many-requests': 'Too many attempts. Wait a few minutes and try again.',
       'auth/network-request-failed': 'No internet connection. The first sign-in needs internet; after that MEIKO works offline.',
       'auth/unauthorized-domain': 'This web address is not allowed in Firebase (add it under Authentication → Settings → Authorized domains).',
-      'auth/operation-not-allowed': 'Email/Password sign-in is not enabled in Firebase yet.'
+      'auth/operation-not-allowed': 'Email/Password sign-in is not enabled in Firebase yet.',
+      'auth/configuration-not-found': 'Registration is not switched on yet (Firebase Authentication not set up). Please tell the app owner.'
     };
     if (/api-key-not-valid|invalid-api-key/.test(c)) return new Error('MEIKO\'s Firebase settings are not valid. Please tell the app owner.');
     return new Error(map[c] || (e && e.message) || 'Something went wrong.');
