@@ -60,7 +60,22 @@
     { id: 'id-tahuna', name: 'Tahuna (Sangihe)', city: 'Sangihe', country: 'Indonesia', lat: 3.6100, lon: 125.4900, verified: false, source: null, aliases: ['SANGIHE', 'Tahuna'] },
     { id: 'id-kendari', name: 'Kendari', city: 'Southeast Sulawesi', country: 'Indonesia', lat: -3.9700, lon: 122.5900, verified: false, source: null, aliases: ['KDI'] },
     { id: 'id-tarakan', name: 'Tarakan', city: 'North Kalimantan', country: 'Indonesia', lat: 3.2900, lon: 117.5900, verified: false, source: null, aliases: ['TRK'] },
-    { id: 'id-banjarmasin', name: 'Banjarmasin (Trisakti)', city: 'South Kalimantan', country: 'Indonesia', lat: -3.3300, lon: 114.5600, verified: false, source: null, aliases: ['BSN', 'BJM', 'Trisakti'] }
+    { id: 'id-banjarmasin', name: 'Banjarmasin (Trisakti)', city: 'South Kalimantan', country: 'Indonesia', lat: -3.3300, lon: 114.5600, verified: false, source: null, aliases: ['BSN', 'BJM', 'Trisakti'] },
+    { id: 'id-nunukan', name: 'Nunukan', city: 'North Kalimantan', country: 'Indonesia', lat: 4.1350, lon: 117.6650, verified: false, source: null, aliases: ['NUK'] },
+    { id: 'id-kotabaru', name: 'Kotabaru', city: 'South Kalimantan', country: 'Indonesia', lat: -3.2400, lon: 116.2250, verified: false, source: null, aliases: ['KBU'] },
+    { id: 'id-sangatta', name: 'Sangatta', city: 'East Kalimantan', country: 'Indonesia', lat: 0.4200, lon: 117.6000, verified: false, source: null, aliases: ['STA', 'SGT'] },
+    { id: 'id-palu', name: 'Palu (Pantoloan)', city: 'Central Sulawesi', country: 'Indonesia', lat: -0.7100, lon: 119.8600, verified: false, source: null, aliases: ['PLU', 'Pantoloan'] },
+    { id: 'id-tolitoli', name: 'Tolitoli', city: 'Central Sulawesi', country: 'Indonesia', lat: 1.0400, lon: 120.8000, verified: false, source: null, aliases: ['TLI'] },
+    { id: 'id-miangas', name: 'Miangas', city: 'Talaud', country: 'Indonesia', lat: 5.5600, lon: 126.5850, verified: false, source: null, aliases: ['MGS'] },
+    { id: 'id-maumere', name: 'Maumere', city: 'Flores', country: 'Indonesia', lat: -8.6150, lon: 122.2150, verified: false, source: null, aliases: ['MRE'] },
+    { id: 'id-gebe', name: 'Gebe', city: 'North Maluku', country: 'Indonesia', lat: -0.0800, lon: 129.4000, verified: false, source: null, aliases: ['GBE', 'Pulau Gebe'] },
+    { id: 'id-dobo', name: 'Dobo (Aru)', city: 'Aru Islands', country: 'Indonesia', lat: -5.7600, lon: 134.2200, verified: false, source: null, aliases: ['ARU', 'Aru'] },
+    { id: 'id-timika', name: 'Timika (Pomako)', city: 'Central Papua', country: 'Indonesia', lat: -4.7900, lon: 136.9600, verified: false, source: null, aliases: ['TMK', 'Pomako'] },
+    { id: 'id-nabire', name: 'Nabire', city: 'Central Papua', country: 'Indonesia', lat: -3.3600, lon: 135.5000, verified: false, source: null, aliases: ['NBR'] },
+    { id: 'id-cirebon', name: 'Cirebon', city: 'West Java', country: 'Indonesia', lat: -6.7100, lon: 108.5700, verified: false, source: null, aliases: ['CBN'] },
+    { id: 'id-cilegon', name: 'Cilegon (Ciwandan)', city: 'Banten', country: 'Indonesia', lat: -6.0200, lon: 105.9500, verified: false, source: null, aliases: ['CLG', 'Ciwandan', 'Merak'] },
+    { id: 'id-tbkarimun', name: 'Tanjung Balai Karimun', city: 'Riau Islands', country: 'Indonesia', lat: 1.0000, lon: 103.4200, verified: false, source: null, aliases: ['TBK', 'Karimun'] },
+    { id: 'id-dabo', name: 'Dabo Singkep', city: 'Riau Islands', country: 'Indonesia', lat: -0.5000, lon: 104.5700, verified: false, source: null, aliases: ['DSK', 'Singkep'] }
   ];
 
   var api = {

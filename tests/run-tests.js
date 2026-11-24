@@ -516,10 +516,16 @@ test('Distance tables: spot checks against the PDFs', function () {
   assert.strictEqual(t('dili', 'kendari').ab, 3451); assert.strictEqual(t('kendari', 'dili').ab, 3451); assert.strictEqual(t('kendari', 'ambon').ab, 345);
   assert.strictEqual(t('jayapura', 'biak').ab, 315); assert.strictEqual(t('makassar', 'balikpapan').ab, 325);
 });
+test('Distance table 2026 update (xlsx): 54 ports, spot checks', function () {
+  var t = distT.TABLES[0], S = seadist.create(distT), m = function (a, b) { return S.pair(a, b).filter(function (e) { return e.table === 'main'; })[0]; };
+  assert.strictEqual(t.id, 'main'); assert.strictEqual(t.keys.length, 54);
+  assert.strictEqual(m('surabaya', 'semarang').ab, 201); assert.strictEqual(m('tpriok', 'cilegon').ab, 72.7); assert.strictEqual(m('sibolga', 'balikpapan').ab, 1637.5);
+  assert.strictEqual(m('makassar', 'kendari').ab, 460); assert.strictEqual(m('ranai', 'pontianak').ab, 260); assert.strictEqual(m('jayapura', 'sorong').ab, 629);
+});
 test('Sea distance: implausible figure flagged, route estimate through table legs', function () {
   var co = {}; ports.all().forEach(function (p) { co[p.id] = p; });
   var S = seadist.create(distT, function (a, b) { var A = co[distT.PLACES[a].port], B = co[distT.PLACES[b].port]; return A && B ? geo.haversine(A.lat, A.lon, B.lat, B.lon) / 1852 : null; });
-  var e = S.pair('tpriok', 'ambon')[0]; assert.strictEqual(e.ab, 353); assert.ok(!e.okAB, 'TPK–AMB 353 NM < straight line');
+  var e = S.pair('tpriok', 'ambon').filter(function (x) { return x.table === 'wiltim'; })[0]; assert.strictEqual(e.ab, 353); assert.ok(!e.okAB, 'TPK–AMB 353 NM < straight line');
   var r = S.route('dumai', 'jayapura'); assert.ok(r && r.path.length >= 3 && r.nm > 2000, JSON.stringify(r));
   assert.ok(S.neighbours('surabaya').length >= 37);
 });

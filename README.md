@@ -128,7 +128,7 @@ Star positions use GMST (IAU 1982) and precession (IAU 1976). Nutation, aberrati
 
 ## Port distance tables (v1.8)
 
-**Port-to-Port** shows the sea distance from two TNI AL distance tables supplied by the user: *Tabel Jarak Pangkalan TNI AL WILBAR* (22 western ports) and the eastern *Tabel Jarak* WILTIM (38 ports). The data are in `js/data/distance-tables.js`, transcribed exactly from the PDFs, and the lookup and routing code is in `js/core/seadist.js`. The straight-line distance and bearings are shown alongside.
+**Port-to-Port** shows an estimated sea distance from distance tables supplied by the user: the 2026 combined update (54 ports, `.xlsx`, used first), then the older western (22 ports) and eastern (38 ports) PDF tables for pairs the update does not cover. The UI deliberately shows no table names (the app is for public use). The data are in `js/data/distance-tables.js`, transcribed exactly from the PDFs, and the lookup and routing code is in `js/core/seadist.js`. The straight-line distance and bearings are shown alongside.
 
 - **Errors are shown, not corrected.** Where the table's two directions differ, both figures are shown. A figure shorter than the straight line between the ports is marked *doubtful*. Pairs missing from the tables are estimated by chaining table legs and labelled as estimates.
 - **New ports.** 37 ports were added to `ports-data.js` with approximate, unverified coordinates.

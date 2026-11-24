@@ -31,11 +31,14 @@
       return out;
     }
     /** Best single figure for a pair: the row-of-departure value unless it is implausible. */
-    function best(a, b) {
-      var p = pair(a, b), c = [];
-      p.forEach(function (e) { if (e.ab != null && e.okAB) c.push(e.ab); if (e.ba != null && e.okBA) c.push(e.ba); });
-      if (!c.length) return null;
-      return Math.min.apply(null, c);
+    function best(a, b) { // tables in priority order (newest first); within a table the smaller plausible figure
+      var p = pair(a, b);
+      for (var i = 0; i < p.length; i++) {
+        var e = p[i], c = [];
+        if (e.ab != null && e.okAB) c.push(e.ab); if (e.ba != null && e.okBA) c.push(e.ba);
+        if (c.length) return Math.min.apply(null, c);
+      }
+      return null;
     }
     var graph = null;
     function buildGraph() {
