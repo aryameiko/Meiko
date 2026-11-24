@@ -747,3 +747,11 @@ body.onb-open { overflow: hidden; }
 .onb-done { display: grid; gap: 12px; text-align: center; } .onb-kv { text-align: left; }
 .onb .small svg.i { width: 14px; height: 14px; vertical-align: -2px; }
 @media (max-width: 380px) { .onb-types { grid-template-columns: repeat(2, 1fr); } }
+
+.onb-alt { width: 100%; }
+.onb-seg { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--border); }
+.onb-seg button { padding: 9px 6px; border-radius: 9px; border: 0; background: none; color: var(--text-2); font: inherit; font-weight: 600; font-size: 14px; cursor: pointer; }
+.onb-seg button.on { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.15); }
+.onb-card > small.hint { min-height: 18px; font-size: 13px; } .onb-card > small.hint.err { color: var(--danger); } .onb-card > small.hint.ok { color: var(--ok); }
+.onb-mail { display: grid; place-items: center; width: 84px; height: 84px; margin: 6px auto; border-radius: 50%; background: var(--accent-soft); color: var(--accent); } .onb-mail svg { width: 40px; height: 40px; }
+.onb-warn { color: var(--warn, #B7791F); } .onb-warn svg.i { width: 14px; height: 14px; vertical-align: -2px; }

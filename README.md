@@ -126,6 +126,10 @@ Three tools under **Astronomy**, all offline:
 
 Star positions use GMST (IAU 1982) and precession (IAU 1976). Nutation, aberration and proper motion are ignored, which leaves an error of about 1′. Data come from d3-celestial (BSD-3, HYG/Hipparcos); see `js/data/LICENSE-d3-celestial`.
 
+## Registration with Firebase (v1.9.7)
+
+Paste the Firebase web config into `js/firebase-config.js` (`MEIKO.FIREBASE_CONFIG = {...}`). With a config present, onboarding becomes **mandatory**: create an account with email + password (Firebase sends a verification link) or sign in, confirm the email, then nickname and vessel avatar. Firebase Auth (app + auth only) is bundled in `js/vendor/firebase-auth.js`, so no CDN is used. Sign-in needs internet once; afterwards the gate only checks the profile saved on the device, so MEIKO opens offline. *Settings → Account* shows the email, lets users change their nickname and sign out. Without a config the screens stay a device-only preview.
+
 ## First-run onboarding (v1.9.6, preview)
 
 `js/onboarding.js` adds Welcome → Email → Nickname → Vessel avatar → Done. It is **not mandatory yet** (`REQUIRED = false`) while the login method is decided; preview it with `?welcome` or `#/welcome`. Registration goes through `js/auth.js` (`MEIKO.auth`): today the `local` provider only checks the email format and stores it on the device (no verification email); a provider such as Firebase Auth can be plugged in with `MEIKO.auth.use({...})` without changing the screens. The nickname is used as the name in Fleet & Chat; the email is never shared there.
