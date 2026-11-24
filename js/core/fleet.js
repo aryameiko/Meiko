@@ -293,7 +293,12 @@
         return head.then(function (r) { minSent = r.sent; return part(0); }).then(function () { return { fid: fid, att: att, sent: minSent }; });
       },
       sendChat: function (text, me) { return publish(KIND_CHAT, Object.assign({}, me, { k: 'chat', text: String(text).slice(0, 500) }), CHAT_TTL_S); },
-      status: status
+      status: status,
+      /** Reconnect at once to relays that dropped (e.g. when the phone wakes up), instead of waiting for the back-off timer. */
+      reconnect: function () {
+        if (stopped || !room) return;
+        relays.forEach(function (u) { var s = socks[u]; if (s && s.ws && s.ws.readyState <= 1) return; if (s) { clearTimeout(s.timer); s.tries = 0; } connect(u); });
+      }
     };
   }
 

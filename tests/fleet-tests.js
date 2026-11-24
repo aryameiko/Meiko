@@ -211,6 +211,18 @@ module.exports = function run(test) {
       .then(function () { return a.sendLive({ name: 'A', ns: 7 }); }).then(function () { return wait(40); })
       .then(function () { assert.strictEqual(b.got.live[0].ns, 7); a.stop(); b.stop(); });
   });
+  t('Fleet: reconnect() reopens a dropped relay at once and the chat arrives again', function () {
+    var relay = new MockRelay(), sockets = [], WS0 = relay.socket();
+    function WS(u) { WS0.call(this, u); sockets.push(this); }
+    WS.prototype = WS0.prototype;
+    var a = client(relay, 'MEIKO-WAKE-0010', { WebSocket: WS }), b = client(relay, 'MEIKO-WAKE-0010');
+    return Promise.all([a.start(), b.start()]).then(function () { return wait(20); })
+      .then(function () { var s = sockets[0]; s.close(); s.onclose(); return wait(5); }) // phone went to sleep: socket dropped, back-off timer waits 2 s
+      .then(function () { assert.strictEqual(a.status().connected, 0); a.reconnect(); return wait(20); })
+      .then(function () { assert.strictEqual(a.status().connected, 1); assert.strictEqual(sockets.length, 2); return b.sendChat('halo', { name: 'B' }); })
+      .then(function () { return wait(40); })
+      .then(function () { assert.ok(a.got.chat.some(function (m) { return m.text === 'halo'; })); a.stop(); b.stop(); });
+  });
 
   return tests.reduce(function (p, tc) {
     return p.then(function () { return test(tc[0], tc[1]); });

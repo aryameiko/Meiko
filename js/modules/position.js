@@ -110,7 +110,13 @@
       watchBtn.addEventListener('click', function () {
         if (gw) { gpsOff(); watchBtn.classList.remove('btn-gold'); watchBtn.innerHTML = icon('i-route') + 'Track'; setStatus('', ''); return; }
         watchBtn.classList.add('btn-gold'); watchBtn.innerHTML = icon('i-x') + 'Stop'; setStatus('', 'Tracking — position updates continuously.');
-        gw = MEIKO.gps.watch(function (f) { renderFix(f); }, function (err) { setStatus('err', ui.esc(err.message)); gpsOff(); watchBtn.classList.remove('btn-gold'); watchBtn.innerHTML = icon('i-route') + 'Track'; });
+        var lost = false;
+        gw = MEIKO.gps.watch(function (f) { if (lost) { lost = false; setStatus('', 'Tracking — position updates continuously.'); } renderFix(f); }, function (err) {
+          setStatus('err', ui.esc(err.message)); lost = true;
+          // Signal loss / timeout: keep tracking (the browser keeps trying). Permission or setup problems: stop.
+          if (err.code === 2 || err.code === 3) return;
+          gpsOff(); watchBtn.classList.remove('btn-gold'); watchBtn.innerHTML = icon('i-route') + 'Track';
+        });
       });
       /* ---- GPS source & external receiver ---- */
       var X = MEIKO.gps.external, sup = X.support();

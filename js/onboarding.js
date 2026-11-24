@@ -173,8 +173,16 @@
     var n = el.querySelector('[data-nick]'); if (n) draft.nick = n.value.trim();
     var v = el.querySelector('[data-vname]'); if (v) draft.vname = v.value.trim();
   }
-  window.addEventListener('online', function () { if (el) { keep(); paint(); } });
-  window.addEventListener('offline', function () { if (el) { keep(); paint(); } });
+  /* Going on/offline only updates the note: repainting would wipe a typed password and re-enable buttons mid sign-in. */
+  function netNote() {
+    if (!el) return;
+    var card = el.querySelector('.onb-card'), cur = el.querySelector('.onb-warn');
+    if (cur) cur.remove();
+    if (!card || STEPS[step] !== 'account' || navigator.onLine !== false) return;
+    var at = card.querySelector('[data-next]'); if (at) at.insertAdjacentHTML('beforebegin', offlineNote());
+  }
+  window.addEventListener('online', netNote);
+  window.addEventListener('offline', netNote);
   MEIKO.onboarding = { open: open, close: close, required: function () { return REQUIRED; } };
   window.addEventListener('hashchange', function () { if (location.hash === '#/welcome') open(); });
   if (wants()) open();

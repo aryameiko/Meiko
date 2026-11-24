@@ -65,7 +65,11 @@
   function ensureGps() {
     if (!MEIKO.gps) return;
     var l = MEIKO.gps.last && MEIKO.gps.last(); if (l) onFix(l);
-    if (!st.gw) st.gw = MEIKO.gps.watch(function () {}, function (e) { ui.toast(e.message); if (e.code !== 2 && e.code !== 3) gpsOff(); });
+    if (!st.gw) st.gw = MEIKO.gps.watch(function () { st.gpsWarned = false; }, function (e) {
+      // Signal loss repeats every 30 s while it lasts: say it once, not every time.
+      if (e.code === 2 || e.code === 3) { if (!st.gpsWarned) ui.toast(e.message); st.gpsWarned = true; return; }
+      ui.toast(e.message); gpsOff();
+    });
   }
   function gpsOff() { if (st.gw) MEIKO.gps.stop(st.gw); st.gw = null; }
   function chatKey() { return 'fleet:chat:' + st.tag; }
@@ -105,9 +109,12 @@
   }
   function putFile(key, rec) { return db().then(function (d) { return new Promise(function (res, rej) { var tx = d.transaction('files', 'readwrite'); tx.objectStore('files').put(rec, key); tx.oncomplete = res; tx.onerror = function () { rej(tx.error); }; }); }); }
   function getFile(key) { return db().then(function (d) { return new Promise(function (res) { var q = d.transaction('files').objectStore('files').get(key); q.onsuccess = function () { res(q.result || null); }; q.onerror = function () { res(null); }; }); }, function () { return null; }); }
+  /* A file from another vessel is only shown as a photo or video; anything else is handled as a plain download,
+     so a received web page or script can never run inside MEIKO. */
+  function safeMime(m) { return /^(image\/(jpeg|png|webp|gif)|video\/(mp4|webm|quicktime|3gpp))$/.test(String(m || '')) ? m : 'application/octet-stream'; }
   function fileURL(key) {
     if (urls[key]) return Promise.resolve(urls[key]);
-    return getFile(key).then(function (r) { if (!r) return null; return (urls[key] = { url: URL.createObjectURL(new Blob([r.bytes], { type: r.mime })), rec: r }); });
+    return getFile(key).then(function (r) { if (!r) return null; return (urls[key] = { url: URL.createObjectURL(new Blob([r.bytes], { type: safeMime(r.mime) })), rec: r }); });
   }
   st.prog = {};
   function onFile(f) {
@@ -299,7 +306,16 @@
   }
   // Resume the group after a reload (sharing resumes only if it was switched on).
   setTimeout(function () { var c = cfg(); if (c.joined && c.code && supported() && navigator.onLine !== false) join(c.code).catch(function () {}); }, 1200);
-  window.addEventListener('online', function () { var c = cfg(); if (c.joined && c.code && !st.client) join(c.code).catch(function () {}); });
+  function wake() {
+    var c = cfg();
+    if (!c.joined || !c.code || navigator.onLine === false) return;
+    if (!st.client) { if (!st.joining) join(c.code).catch(function () {}); return; }
+    if (st.client.reconnect) st.client.reconnect();
+    setTimeout(beat, 3000);
+  }
+  window.addEventListener('online', wake);
+  // Phones close the connections while MEIKO is in the background: reconnect as soon as it is opened again.
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') wake(); });
 
   MEIKO.fleet = { join: join, leave: leave, setShare: setShare, sendChat: sendChat, sendDM: sendDM, sendAttachment: sendAttachment, fileURL: fileURL, state: st, cfg: cfg, subscribe: function (fn) { subs.push(fn); return function () { subs = subs.filter(function (x) { return x !== fn; }); }; } };
 
@@ -321,7 +337,7 @@
   MEIKO.features.register({
     id: 'fleet', cat: 'navigation', order: 4, icon: 'i-chat', title: 'Fleet & Chat',
     desc: 'See other MEIKO vessels online and chat with them', keywords: 'chat fleet group armada kapal lain posisi teman pesan message',
-    lead: 'Join a group with a shared code to see the other vessels on a map and chat. No account needed.',
+    lead: 'Join a group with a shared code to see the other vessels on a map and chat. Only your nickname and vessel are shown, never your email.',
     render: function (view) {
       var c = cfg();
       var setup = '<div class="card card-pad form-gap" data-setup>' +
@@ -404,9 +420,9 @@
       }
       function attHTML(m) {
         var a = m.att; if (!a || !m.from) return '';
-        var key = m.from + ':' + a.fid, pr = st.prog[key], img = /^image\//.test(a.mime), vid = /^video\//.test(a.mime), med = img || vid;
+        var key = m.from + ':' + a.fid, pr = st.prog[key], mt = safeMime(a.mime), img = /^image\//.test(mt), vid = /^video\//.test(mt), med = img || vid;
         var ratio = med && a.w && a.h ? ' style="aspect-ratio:' + a.w + '/' + a.h + '"' : '';
-        return '<div class="att' + (img ? ' att-img' : vid ? ' att-img att-vid' : ' att-file') + '" data-att="' + esc(key) + '" data-name="' + esc(a.name) + '" data-mime="' + esc(a.mime) + '"' + ratio + '>' +
+        return '<div class="att' + (img ? ' att-img' : vid ? ' att-img att-vid' : ' att-file') + '" data-att="' + esc(key) + '" data-name="' + esc(a.name) + '" data-mime="' + esc(mt) + '"' + ratio + '>' +
           (vid ? '<span class="att-vlabel">' + icon('i-video') + Math.max(1, Math.round(a.size / 1024)) + ' KB</span>' : img ? '' : icon('i-file') + '<span><b>' + esc(a.name) + '</b><small>' + Math.max(1, Math.round(a.size / 1024)) + ' KB</small></span>') +
           '<small class="att-state">' + (pr != null ? 'Receiving… ' + Math.round(pr * 100) + '%' : 'Loading…') + '</small></div>';
       }

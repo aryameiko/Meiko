@@ -100,8 +100,12 @@
         navigator.serviceWorker.getRegistration().then(function (r) { if (r) r.update().then(function () { ui.toast('Checked for updates'); }); else ui.toast('No offline cache registered'); });
       });
       ui.$('[data-wipe]', view).addEventListener('click', function () {
-        ui.sheet({ title: 'Clear all local data?', html: '<p>This deletes your settings, saved locations, calculator history and remembered form values on this device. It cannot be undone.</p><div class="actions"><button class="btn btn-danger" data-yes>' + icon('i-trash') + 'Delete everything</button><button class="btn btn-ghost" data-close>Cancel</button></div>', onMount: function (body, close) {
-          ui.$('[data-yes]', body).addEventListener('click', function () { MEIKO.storage.clearAll(); set.reset(); close(); ui.toast('Local data cleared'); MEIKO.app.rerender(); });
+        ui.sheet({ title: 'Clear all local data?', html: '<p>This deletes your settings, saved locations, tracks, vessel, calculator history and remembered form values on this device, and signs you out. It cannot be undone.</p><div class="actions"><button class="btn btn-danger" data-yes>' + icon('i-trash') + 'Delete everything</button><button class="btn btn-ghost" data-close>Cancel</button></div>', onMount: function (body, close) {
+          ui.$('[data-yes]', body).addEventListener('click', function () { if (MEIKO.fleet && MEIKO.fleet.state.client) MEIKO.fleet.leave(true);
+            MEIKO.storage.clearAll(); set.reset(); close();
+            // The registration was deleted too: sign out and start again from the welcome screen.
+            if (MEIKO.onboarding && MEIKO.onboarding.required()) { Promise.resolve(MEIKO.auth.signOut()).then(function () { location.hash = '#/welcome'; MEIKO.app.rerender(); }); return; }
+            ui.toast('Local data cleared'); MEIKO.app.rerender(); });
         } });
       });
     }

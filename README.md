@@ -146,6 +146,14 @@ Paste the Firebase web config into `js/firebase-config.js` (`MEIKO.FIREBASE_CONF
 - **Limits.** Both sides need internet; public relays can be slow or down; phones pause web apps in the background. It is not a safety or distress system: use VHF/DSC and AIS. A commercial version with guaranteed delivery and history would need a proper backend (for example Firebase or Supabase under the owner's account).
 - **Code.** Protocol and crypto in `js/core/fleet.js` (tests in `tests/fleet-tests.js` with an in-memory relay), UI in `js/modules/fleet.js`, signing library bundled in `js/vendor/nostr-crypto.js` (@noble/curves + @noble/hashes, MIT).
 
+## Fixes (v1.11.1)
+
+- **GPS source Auto:** a running GPS watch (live navigation, *Track*, Fleet sharing) now moves to an external receiver when it is connected, and falls back to the phone GPS when the receiver is unplugged, instead of stopping. Changing the GPS source in Settings restarts a running watch on the new source.
+- **My Position → Track** keeps tracking through a short loss of GPS signal (like live navigation), instead of stopping on the first timeout.
+- **Fleet & Chat:** reconnects to the relays as soon as MEIKO is opened again after the phone slept (before, it could wait up to a minute); a lost GPS signal is reported once instead of every 30 s; files received from other vessels are only shown as photo or video when they really are one, anything else is a plain download (a received web page can never run inside MEIKO).
+- **Sign-in:** after signing out and back in with the same account, the nickname is remembered on this device. Going online or offline on the sign-in screen no longer clears the typed password.
+- **Settings → Clear all local data** now also signs out and returns to the welcome screen (it deleted the registration but left the app open).
+
 ## Fixes (v1.9.3)
 
 - **GPS shared between tools.** Several tools can now watch the GPS at once. Before, pressing *Stop GPS* in live navigation, or leaving *My Position*, switched the GPS off for everyone, so Fleet & Chat position sharing silently stopped. Sharing off now also switches the GPS off again.

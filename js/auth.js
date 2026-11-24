@@ -78,7 +78,15 @@
     return true;
   }
   function saveAccount(r) { var pv = providers[active]; return save({ email: r.email, verified: !!r.verified, uid: r.uid, via: r.via || 'password', provider: pv.id, createdAt: (profile() && profile().createdAt) || Date.now() }); }
-  function switchTo(r) { var old = profile(); if (old && old.uid !== r.uid) MEIKO.storage.remove(KEY); var p = saveAccount(r); if (!p.nickname && r.name) p = save({ suggestedNick: r.name.slice(0, 24) }); return p; }
+  /* Nicknames are remembered per account on this device, so signing out and back in does not ask for it again. */
+  function rememberNick(p) { if (!p || !p.uid || !p.nickname) return; var m = MEIKO.storage.get('nicks', {}) || {}; m[p.uid] = p.nickname; MEIKO.storage.set('nicks', m); }
+  function switchTo(r) {
+    var old = profile(); if (old && old.uid !== r.uid) MEIKO.storage.remove(KEY);
+    var p = saveAccount(r), known = (MEIKO.storage.get('nicks', {}) || {})[r.uid];
+    if (!p.nickname && known) p = save({ nickname: known });
+    if (!p.nickname && r.name) p = save({ suggestedNick: r.name.slice(0, 24) });
+    return p;
+  }
 
   MEIKO.auth = {
     EMAIL_RE: EMAIL_RE,
@@ -90,7 +98,7 @@
       var pv = providers[active];
       return pv.register(email).then(function (r) { return save({ email: r.email, verified: !!r.verified, uid: r.uid, provider: pv.id, createdAt: (profile() && profile().createdAt) || Date.now() }); });
     },
-    setNickname: function (n) { return save({ nickname: String(n || '').trim().slice(0, 24) }); },
+    setNickname: function (n) { var p = save({ nickname: String(n || '').trim().slice(0, 24) }); rememberNick(p); return p; },
     profile: profile,
     nickname: function () { var p = profile(); return p && p.nickname ? p.nickname : ''; },
     isComplete: function () { var p = profile(); return !!(p && p.email && p.nickname && MEIKO.vessel && MEIKO.vessel.get()); },

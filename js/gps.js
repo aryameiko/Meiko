@@ -296,35 +296,54 @@
    * while the map's live navigation runs). watch() returns a handle; stop(handle) ends only that watcher, and the
    * GPS itself is switched off when the last watcher stops. stop() without a handle ends every watcher.
    */
-  var watchers = [], under = null; // under = the running source: { kind: 'device', id } | { kind: 'external', fn }
+  var watchers = [], under = null; // under = the running source: { kind: 'device'|'external'|'auto', id, fn }
   function deliver(f) { watchers.slice().forEach(function (w) { try { w.onFix(f); } catch (e) {} }); }
   function failAll(e) { watchers.slice().forEach(function (w) { try { if (w.onErr) w.onErr(e); } catch (x) {} }); }
   function startUnder() {
-    var p = pref();
-    if (p === 'external' || (p === 'auto' && ext.connected)) {
+    var p = pref(), hasDevice = window.isSecureContext && ('geolocation' in navigator);
+    if (p === 'external') {
       if (!ext.connected) return new Error('The external GPS is not connected. Connect it below, or switch the GPS source to Auto or Phone.');
       var fn = function (f) { if (f.source === 'external') deliver(f); };
       listeners.push(fn); under = { kind: 'external', fn: fn };
       return null;
     }
-    if (!window.isSecureContext || !('geolocation' in navigator)) return explain();
+    if (p === 'auto') {
+      /* Auto: listen to the external receiver AND the phone GPS. External fixes win while they are fresh, so the
+         watch carries on (on the phone GPS) when the receiver is unplugged, and moves to the receiver when it is
+         connected later, without the tools having to restart anything. */
+      if (!hasDevice && !ext.connected) return explain();
+      var afn = function (f) { if (f.source === 'external') deliver(f); };
+      listeners.push(afn); under = { kind: 'auto', fn: afn, id: null };
+      if (hasDevice) under.id = navigator.geolocation.watchPosition(function (pos) { var f = toFix(pos); store(f); if (!extFix()) deliver(f); },
+        function (err) { if (!extFix()) failAll(explain(err)); }, { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 });
+      return null;
+    }
+    if (!hasDevice) return explain();
     under = { kind: 'device', id: navigator.geolocation.watchPosition(function (pos) { var f = toFix(pos); store(f); deliver(f); },
       function (err) { failAll(explain(err)); }, { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 }) };
     return null;
   }
   function stopUnder() {
     if (!under) return;
-    if (under.kind === 'device') navigator.geolocation.clearWatch(under.id);
-    else { var fn = under.fn; listeners = listeners.filter(function (x) { return x !== fn; }); }
+    if (under.id != null) navigator.geolocation.clearWatch(under.id);
+    if (under.fn) { var fn = under.fn; listeners = listeners.filter(function (x) { return x !== fn; }); }
     under = null;
+  }
+  /** The GPS source setting changed: restart the running watch on the new source (the watchers keep their handles). */
+  function restart() {
+    if (!under || !watchers.length) return;
+    stopUnder();
+    var err = startUnder();
+    if (err) { var ws = watchers.slice(); watchers = []; ws.forEach(function (w) { try { if (w.onErr) w.onErr(err); } catch (x) {} }); }
   }
   function watch(onFix, onErr) {
     var w = { onFix: onFix, onErr: onErr };
     if (!under) { var err = startUnder(); if (err) { if (onErr) onErr(err); return null; } }
     watchers.push(w);
     // Give the new watcher the current position straight away if it is fresh.
-    var f0 = under.kind === 'external' ? extFix() : (last && last.source === 'device' && Date.now() - last.timestamp < 5000 ? last : null);
-    if (f0) { if (under.kind === 'external') onFix(f0); else setTimeout(function () { if (watchers.indexOf(w) !== -1) onFix(f0); }, 0); }
+    var f0 = under.kind !== 'device' ? extFix() : null;
+    if (!f0 && under.kind !== 'external' && last && last.source === 'device' && Date.now() - last.timestamp < 5000) f0 = last;
+    if (f0) setTimeout(function () { if (watchers.indexOf(w) !== -1) onFix(f0); }, 0);
     return w;
   }
   function stop(handle) {
@@ -343,7 +362,7 @@
     getPosition: getPosition, watch: watch, stop: stop, quality: quality,
     last: function () { return last; }, isWatching: function (handle) { return handle ? watchers.indexOf(handle) !== -1 : watchers.length > 0; },
     onFix: function (fn) { listeners.push(fn); }, offFix: function (fn) { listeners = listeners.filter(function (x) { return x !== fn; }); },
-    source: pref, platform: platform, permissionState: permissionState, requestPermission: requestPermission, watchPermission: watchPermission,
+    source: pref, restart: restart, platform: platform, permissionState: permissionState, requestPermission: requestPermission, watchPermission: watchPermission,
     external: {
       support: support, status: status, connectSerial: connectSerial, connectBluetooth: connectBluetooth,
       connectTest: connectTest, connectNetwork: connectNetwork, disconnect: disconnect,
@@ -351,5 +370,6 @@
       NUS_SERVICE: NUS_SERVICE
     }
   };
+  MEIKO.settings.onChange(function (k) { if (k === 'gpsSource') restart(); });
   autoReconnect();
 })();
