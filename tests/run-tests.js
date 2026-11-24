@@ -289,9 +289,9 @@ test('All ports have valid coordinates, unique ids and are flagged unverified', 
   });
   assert.ok(ports.all().length >= 10);
 });
-test('Tanjung Priok → Tanjung Perak is a plausible straight-line distance (≈ 370 NM)', function () {
+test('Tanjung Priok → Tanjung Perak is a plausible straight-line distance (≈ 355 NM)', function () {
   var a = ports.byId('id-tpriok'), b = ports.byId('id-tperak');
-  near(geo.greatCircle(a.lat, a.lon, b.lat, b.lon).distanceNM, 370, 15);
+  near(geo.greatCircle(a.lat, a.lon, b.lat, b.lon).distanceNM, 355, 10);
 });
 test('Port search matches name, city and alias', function () {
   assert.strictEqual(ports.search('surabaya')[0].id, 'id-tperak');
@@ -528,6 +528,28 @@ test('Sea distance: implausible figure flagged, route estimate through table leg
   var e = S.pair('tpriok', 'ambon').filter(function (x) { return x.table === 'wiltim'; })[0]; assert.strictEqual(e.ab, 353); assert.ok(!e.okAB, 'TPK–AMB 353 NM < straight line');
   var r = S.route('nias', 'nabire'); assert.ok(r && r.path.length >= 3 && r.nm > 2000, JSON.stringify(r));
   assert.ok(S.neighbours('surabaya').length >= 37);
+});
+
+/* ---------- Port positions vs coastline (gross-error check) ---------- */
+test('Ports: no position more than 4 km inland (Natural Earth 10m coast; river ports exempt), every position has a source or is listed as estimate', function () {
+  var landF = require(path.join(__dirname, 'fixtures', 'ne10m-land-indonesia.json')).polygons;
+  function inRing(x, y, r) { var c = false; for (var i = 0, j = r.length - 1; i < r.length; j = i++) { var xi = r[i][0], yi = r[i][1], xj = r[j][0], yj = r[j][1]; if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) c = !c; } return c; }
+  function segDistKm(lat, lon, a, b) {
+    var k = Math.cos(lat * Math.PI / 180), ax = (a[0] - lon) * k, ay = a[1] - lat, bx = (b[0] - lon) * k, by = b[1] - lat;
+    var dx = bx - ax, dy = by - ay, t = Math.max(0, Math.min(1, -(ax * dx + ay * dy) / (dx * dx + dy * dy || 1)));
+    return Math.hypot(ax + t * dx, ay + t * dy) * 111.32;
+  }
+  var inland = [], estimates = [];
+  ports.all().forEach(function (p) {
+    if (p.lat < -11.5 || p.lat > 7 || p.lon < 94 || p.lon > 142) return;
+    if (!p.source) estimates.push(p.id);
+    var poly = landF.filter(function (pg) { return inRing(p.lon, p.lat, pg[0]) && !pg.slice(1).some(function (h) { return inRing(p.lon, p.lat, h); }); })[0];
+    if (!poly) return;
+    var d = Infinity; poly.forEach(function (r) { for (var i = 1; i < r.length; i++) d = Math.min(d, segDistKm(p.lat, p.lon, r[i - 1], r[i])); });
+    if (d > 4 && !p.river) inland.push(p.id + ' ' + d.toFixed(1) + ' km');
+  });
+  assert.deepStrictEqual(inland, []);
+  assert.deepStrictEqual(estimates.sort(), ['id-miangas', 'id-ranai', 'id-tratai', 'tl-dili']);
 });
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed\n');

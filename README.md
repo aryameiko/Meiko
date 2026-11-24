@@ -131,7 +131,7 @@ Star positions use GMST (IAU 1982) and precession (IAU 1976). Nutation, aberrati
 **Port-to-Port** shows an estimated sea distance from distance tables supplied by the user: the 2026 combined update (54 ports, `.xlsx`, used first), then the older western (22 ports) and eastern (38 ports) PDF tables for pairs the update does not cover. The UI deliberately shows no table names (the app is for public use). The data are in `js/data/distance-tables.js`, transcribed exactly from the PDFs, and the lookup and routing code is in `js/core/seadist.js`. The straight-line distance and bearings are shown alongside.
 
 - **Errors are shown, not corrected.** Where the table's two directions differ, both figures are shown. A figure shorter than the straight line between the ports is marked *doubtful*. Pairs missing from the tables are estimated by chaining table legs and labelled as estimates.
-- **New ports.** 37 ports were added to `ports-data.js` with approximate, unverified coordinates.
+- **Port positions (v1.8.4).** Positions are taken from published harbour points, in this order: the SMDG Terminal Code List, the Kemenhub/Dephub port point datasets, then the NGA World Port Index (1′ precision). Each record's `source` names where its position came from. Ranai, Teluk Ratai, Miangas and Dili have no source point and remain MEIKO estimates (`source: null`). A test checks that no port lies more than 4 km inland of the Natural Earth 10 m coastline (river ports such as Palembang, Pontianak and Banjarmasin are exempt). The offline base map is coarse, so at low zoom a harbour can still appear to sit on land.
 - **Unidentified codes.** P. Gundul, BLP, MAS and the eastern table's NATUNA could not be identified, so they have no position.
 
 ## Accuracy & data status
