@@ -715,6 +715,12 @@ svg.i.rot-up { transform: rotate(-90deg); } svg.i.rot-down { transform: rotate(9
 .att-file .att-dl { margin-left: auto; flex: none; }
 .att-img .att-dl { position: absolute; right: 6px; bottom: 6px; background: rgba(0,0,0,.55); color: #fff; border-radius: 8px; padding: 4px; }
 .att-dl svg { width: 16px; height: 16px; }
+.att-vid { background: #000; }
+.att-vid video { width: 100%; height: 100%; display: block; background: #000; }
+.att-vid .att-dl { top: 6px; bottom: auto; }
+.att-vlabel { display: inline-flex; align-items: center; gap: 4px; color: #fff; font-size: 12px; opacity: .8; }
+.att-vlabel svg { width: 18px; height: 18px; }
+.att-vid .att-state { color: #ddd; }
 img.att-full { width: 100%; height: auto; border-radius: 10px; display: block; }
 
 .fleet-sheet .fs-art { display: grid; place-items: center; padding: 4px 0 10px; } .fleet-sheet .fs-art svg { width: 160px; height: auto; }

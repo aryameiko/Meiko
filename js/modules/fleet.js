@@ -137,19 +137,93 @@
       img.src = u;
     });
   }
-  /** Send a picked file or photo to the current chat (group or a private chat). */
-  function sendAttachment(to, file, caption, onProgress) {
+  var MAX_DOC = 512 * 1024, VIDEO_MAX_S = 20, VIDEO_BUDGET = 900 * 1024;
+  function isVideo(file) { return /^video\//i.test(file.type || '') || /\.(mp4|m4v|mov|webm|3gp|mkv)$/i.test(file.name || ''); }
+  /** Best format this browser can record: MP4/H.264 plays almost everywhere; WebM is the fallback. */
+  function videoMime() {
+    if (!window.MediaRecorder || !MediaRecorder.isTypeSupported) return '';
+    var c = ['video/mp4;codecs=avc1,mp4a.40.2', 'video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
+    for (var i = 0; i < c.length; i++) if (MediaRecorder.isTypeSupported(c[i])) return c[i];
+    return '';
+  }
+  /**
+   * Re-encode a video clip on the device to a short, small file: long side 480 px, about 24 fps,
+   * bitrate chosen so the first VIDEO_MAX_S seconds fit in about 900 KB. Plays the clip into a canvas
+   * (silently) and records it with MediaRecorder, so it takes as long as the clip itself.
+   * onProgress(fraction). Resolves { bytes, mime, w, h, dur, cut }.
+   */
+  function compressVideo(file, onProgress) {
+    return new Promise(function (res, rej) {
+      var mime = videoMime(); if (!mime || !HTMLCanvasElement.prototype.captureStream) return rej(new Error('This browser cannot compress video. Update Chrome or Safari, or send a clip under ' + Math.round(C.fleet.MAX_FILE / 1024) + ' KB.'));
+      var u = URL.createObjectURL(file), v = document.createElement('video'), done = false, ac = null, timer = null;
+      v.playsInline = true; v.preload = 'auto'; v.muted = false; v.src = u;
+      function fin(err, out) {
+        if (done) return; done = true; clearInterval(timer);
+        try { v.pause(); } catch (e) {} v.removeAttribute('src'); try { v.load(); } catch (e) {} URL.revokeObjectURL(u);
+        if (ac) ac.close().catch(function () {});
+        err ? rej(err) : res(out);
+      }
+      v.onerror = function () { fin(new Error('This video format cannot be read on this phone. Try recording with the camera button.')); };
+      v.onloadedmetadata = function () {
+        var vw = v.videoWidth, vh = v.videoHeight, dur = isFinite(v.duration) ? v.duration : VIDEO_MAX_S;
+        if (!vw || !vh) return fin(new Error('This video has no picture that can be read here.'));
+        var len = Math.min(dur, VIDEO_MAX_S), sc = Math.min(1, 480 / Math.max(vw, vh));
+        var w = Math.max(2, Math.round(vw * sc / 2) * 2), h = Math.max(2, Math.round(vh * sc / 2) * 2);
+        var cv = document.createElement('canvas'); cv.width = w; cv.height = h; var cx = cv.getContext('2d');
+        var stream = cv.captureStream(24), aBits = 32000;
+        try {
+          var AC = window.AudioContext || window.webkitAudioContext; ac = new AC();
+          var src = ac.createMediaElementSource(v), dst = ac.createMediaStreamDestination(); src.connect(dst);
+          dst.stream.getAudioTracks().forEach(function (t) { stream.addTrack(t); });
+          if (ac.state === 'suspended') ac.resume().catch(function () {});
+        } catch (e) { ac = null; v.muted = true; aBits = 0; }
+        var vBits = Math.max(120000, Math.min(500000, Math.floor(VIDEO_BUDGET * 8 / Math.max(len, 1) * 0.92) - aBits));
+        var rec, chunks = [];
+        try { rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: vBits, audioBitsPerSecond: aBits || undefined }); }
+        catch (e) { return fin(new Error('This browser cannot compress video (' + e.message + ').')); }
+        rec.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
+        rec.onstop = function () {
+          var b = new Blob(chunks, { type: mime.split(';')[0] });
+          b.arrayBuffer().then(function (ab) { fin(null, { bytes: new Uint8Array(ab), mime: mime.split(';')[0], w: w, h: h, dur: Math.round(Math.min(v.currentTime || len, len)), cut: dur > VIDEO_MAX_S + 0.5 }); });
+        };
+        function draw() { try { cx.drawImage(v, 0, 0, w, h); } catch (e) {} }
+        function stop() { if (rec.state !== 'inactive') { draw(); rec.stop(); } try { v.pause(); } catch (e) {} }
+        v.onended = stop;
+        v.onplaying = function () {
+          if (rec.state !== 'inactive') return;
+          rec.start(1000);
+          /* a timer, not requestAnimationFrame, so it keeps drawing if the screen dims */
+          timer = setInterval(function () {
+            draw(); if (onProgress) onProgress(Math.min(1, v.currentTime / len));
+            if (v.currentTime >= len) stop();
+          }, 1000 / 24);
+        };
+        draw();
+        var pp = v.play(); if (pp && pp.catch) pp.catch(function () { v.muted = true; v.play().catch(function (e) { fin(new Error('Could not play the video to compress it (' + e.message + ').')); }); });
+      };
+      setTimeout(function () { if (!done && !v.videoWidth) fin(new Error('This video could not be opened.')); }, 15000);
+    });
+  }
+  /** Send a picked file, photo or video to the current chat (group or a private chat). onPrep(fraction) while a video is compressed. */
+  function sendAttachment(to, file, caption, onProgress, onPrep) {
     if (!st.client) return Promise.reject(new Error('Join a group first.'));
     var isImg = /^image\/(jpeg|png|webp|gif|heic|heif)$/i.test(file.type) || /\.(jpe?g|png|webp|heic|heif)$/i.test(file.name || '');
-    var prep = isImg && !/gif$/i.test(file.type) ? compressImage(file).then(function (r) { r.name = (file.name || 'photo').replace(/\.[^.]+$/, '') + '.jpg'; return r; })
+    var base = (file.name || 'file').replace(/\.[^.]+$/, ''), vid = isVideo(file);
+    var prep = vid ? compressVideo(file, onPrep).then(function (r) { r.name = (base === 'file' ? 'video' : base) + (/mp4/.test(r.mime) ? '.mp4' : '.webm'); return r; }, function (er) {
+          /* could not re-encode: a clip that is already small enough still goes as it is */
+          if (file.size && file.size <= C.fleet.MAX_FILE) return file.arrayBuffer().then(function (ab) { return { bytes: new Uint8Array(ab), mime: file.type || 'video/mp4', name: file.name || 'video.mp4' }; });
+          throw er;
+        })
+      : isImg && !/gif$/i.test(file.type) ? compressImage(file).then(function (r) { r.name = base + '.jpg'; return r; })
       : file.arrayBuffer().then(function (ab) { return { bytes: new Uint8Array(ab), mime: file.type || 'application/octet-stream', name: file.name || 'file' }; });
     return prep.then(function (r) {
-      if (r.bytes.length > C.fleet.MAX_FILE) throw new Error('File too large: ' + Math.round(r.bytes.length / 1024) + ' KB. The limit is ' + Math.round(C.fleet.MAX_FILE / 1024) + ' KB (photos are compressed automatically).');
+      var lim = vid ? C.fleet.MAX_FILE : MAX_DOC;
+      if (r.bytes.length > lim) throw new Error((vid ? 'The video is still too large after compression: ' : 'File too large: ') + Math.round(r.bytes.length / 1024) + ' KB. The limit is ' + Math.round(lim / 1024) + ' KB' + (vid ? '. Record a shorter clip (up to ' + VIDEO_MAX_S + ' seconds).' : ' (photos and videos are compressed automatically).'));
       var fid = Array.prototype.map.call(window.MeikoNostrCrypto.randomBytes(8), function (x) { return ('0' + x.toString(16)).slice(-2); }).join('');
       var m = me();
       return putFile(st.client.pubkey + ':' + fid, { bytes: r.bytes, name: r.name, mime: r.mime, at: Date.now() }).catch(function () {}).then(function () {
         return st.client.sendFile(to, r.bytes, { fid: fid, name: r.name, mime: r.mime, w: r.w, h: r.h }, caption, { name: m.name, callsign: m.callsign, v: m.v }, onProgress);
-      });
+      }).then(function (out) { out.cut = !!r.cut; out.kb = Math.round(r.bytes.length / 1024); return out; });
     });
   }
   function peerName(id) { return (st.peers[id] && st.peers[id].name) || st.dmName[id] || ('Vessel ' + C.fleet.shortId(id)); }
@@ -266,7 +340,7 @@
         '<div class="fleet-chat"><div class="label">Chat</div><div class="chat-tabs" data-tabs role="tablist"></div><div data-dmhead></div><div class="chat-list" data-chat aria-live="polite"></div>' +
         '<div class="send-prog small muted" data-sendprog hidden></div>' +
         '<form class="chat-form" data-chatform><button type="button" class="btn btn-ghost att-btn" data-attach aria-label="Send a photo or file">' + icon('i-clip') + '</button>' +
-        '<input type="file" accept="image/*" capture="environment" data-pick="camera" hidden><input type="file" accept="image/*" data-pick="gallery" hidden><input type="file" data-pick="file" hidden>' +
+        '<input type="file" accept="image/*" capture="environment" data-pick="camera" hidden><input type="file" accept="image/*" data-pick="gallery" hidden><input type="file" accept="video/*" capture="environment" data-pick="vcam" hidden><input type="file" accept="video/*" data-pick="vgallery" hidden><input type="file" data-pick="file" hidden>' +
         '<input class="input" data-msg maxlength="500" placeholder="Type a message" autocomplete="off" enterkeyhint="send"><button class="btn btn-primary" type="submit">Send</button></form></div>' +
         '<div class="actions"><button type="button" class="btn btn-ghost" data-leave>' + icon('i-x') + 'Leave group</button></div></div>';
       view.innerHTML = ui.pageHead(this) + '<div data-fleet-page class="fleet-page">' + setup + live +
@@ -330,10 +404,10 @@
       }
       function attHTML(m) {
         var a = m.att; if (!a || !m.from) return '';
-        var key = m.from + ':' + a.fid, pr = st.prog[key], img = /^image\//.test(a.mime);
-        var ratio = img && a.w && a.h ? ' style="aspect-ratio:' + a.w + '/' + a.h + '"' : '';
-        return '<div class="att' + (img ? ' att-img' : ' att-file') + '" data-att="' + esc(key) + '" data-name="' + esc(a.name) + '" data-mime="' + esc(a.mime) + '"' + ratio + '>' +
-          (img ? '' : icon('i-file') + '<span><b>' + esc(a.name) + '</b><small>' + Math.max(1, Math.round(a.size / 1024)) + ' KB</small></span>') +
+        var key = m.from + ':' + a.fid, pr = st.prog[key], img = /^image\//.test(a.mime), vid = /^video\//.test(a.mime), med = img || vid;
+        var ratio = med && a.w && a.h ? ' style="aspect-ratio:' + a.w + '/' + a.h + '"' : '';
+        return '<div class="att' + (img ? ' att-img' : vid ? ' att-img att-vid' : ' att-file') + '" data-att="' + esc(key) + '" data-name="' + esc(a.name) + '" data-mime="' + esc(a.mime) + '"' + ratio + '>' +
+          (vid ? '<span class="att-vlabel">' + icon('i-video') + Math.max(1, Math.round(a.size / 1024)) + ' KB</span>' : img ? '' : icon('i-file') + '<span><b>' + esc(a.name) + '</b><small>' + Math.max(1, Math.round(a.size / 1024)) + ' KB</small></span>') +
           '<small class="att-state">' + (pr != null ? 'Receiving… ' + Math.round(pr * 100) + '%' : 'Loading…') + '</small></div>';
       }
       function msgHTML(m, showName) {
@@ -345,8 +419,10 @@
           MEIKO.fleet.fileURL(el.dataset.att).then(function (f) {
             if (!f) { var p = st.prog[el.dataset.att]; el.querySelector('.att-state').textContent = p != null ? 'Receiving… ' + Math.round(p * 100) + '%' : 'Waiting for the file… (needs the sender or a relay that kept it)'; return; }
             el.dataset.ready = '1';
+            var md = /^(image|video)\//.test(el.dataset.mime);
             if (/^image\//.test(el.dataset.mime)) { el.innerHTML = '<img alt="' + esc(el.dataset.name) + '" src="' + f.url + '">'; el.querySelector('img').addEventListener('load', function () { var box = $('[data-chat]'); if (box.dataset.stick) box.scrollTop = box.scrollHeight; }); }
-            el.insertAdjacentHTML('beforeend', '<a class="att-dl" href="' + f.url + '" download="' + esc(el.dataset.name) + '">' + icon('i-download') + (/^image\//.test(el.dataset.mime) ? '' : 'Save') + '</a>');
+            else if (/^video\//.test(el.dataset.mime)) el.innerHTML = '<video controls playsinline preload="metadata" src="' + f.url + '#t=0.1" aria-label="' + esc(el.dataset.name) + '"></video>';
+            el.insertAdjacentHTML('beforeend', '<a class="att-dl" href="' + f.url + '" download="' + esc(el.dataset.name) + '">' + icon('i-download') + (md ? '' : 'Save') + '</a>');
             var st0 = el.querySelector('.att-state'); if (st0) st0.remove();
           });
         });
@@ -436,7 +512,7 @@
       }
       function pick(kind) {
         var inp = $('[data-pick="' + kind + '"]');
-        if (kind === 'camera' && navigator.permissions && navigator.permissions.query) {
+        if ((kind === 'camera' || kind === 'vcam') && navigator.permissions && navigator.permissions.query) {
           navigator.permissions.query({ name: 'camera' }).then(function (r) {
             if (r.state === 'denied') ui.sheet({ title: 'Camera blocked', html: permHelp('camera') + '<div class="actions"><button class="btn btn-ghost" data-close>OK</button></div>' });
             else inp.click();
@@ -448,10 +524,10 @@
       $('[data-attach]').addEventListener('click', function () {
         if (!st.client) return;
         var where = st.view === 'group' ? 'everyone in this group' : peerName(st.view) + ' only (private, end-to-end encrypted)';
-        ui.sheet({ title: 'Send a photo or file', html:
-          '<p class="small muted">To: <b>' + esc(where) + '</b>. Your phone may ask for permission to use the camera or your files. Choose <b>Allow</b>; MEIKO only reads the photo or file you pick.</p>' +
-          '<div class="att-pick"><button class="btn btn-primary" data-k="camera">' + icon('i-camera') + 'Take photo</button><button class="btn btn-ghost" data-k="gallery">' + icon('i-image') + 'Photo from gallery</button><button class="btn btn-ghost" data-k="file">' + icon('i-file') + 'Document / file</button></div>' +
-          '<p class="small muted mt-12">Photos are compressed to about 300 KB. Other files: up to ' + Math.round(C.fleet.MAX_FILE / 1024) + ' KB. Text typed in the message box is sent as the caption.</p>',
+        ui.sheet({ title: 'Send a photo, video or file', html:
+          '<p class="small muted">To: <b>' + esc(where) + '</b>. Your phone may ask for permission to use the camera or your files. Choose <b>Allow</b>; MEIKO only reads the photo, video or file you pick.</p>' +
+          '<div class="att-pick"><button class="btn btn-primary" data-k="camera">' + icon('i-camera') + 'Take photo</button><button class="btn btn-primary" data-k="vcam">' + icon('i-video') + 'Record video</button><button class="btn btn-ghost" data-k="gallery">' + icon('i-image') + 'Photo from gallery</button><button class="btn btn-ghost" data-k="vgallery">' + icon('i-video') + 'Video from gallery</button><button class="btn btn-ghost" data-k="file">' + icon('i-file') + 'Document / file</button></div>' +
+          '<p class="small muted mt-12">Photos are compressed to about 300 KB. Videos are cut to the first ' + VIDEO_MAX_S + ' seconds and compressed on this phone to under 1 MB (480p); compressing takes as long as the clip. Other files: up to ' + Math.round(MAX_DOC / 1024) + ' KB. Text typed in the message box is sent as the caption.</p>',
           onMount: function (body, close) { ui.$$('[data-k]', body).forEach(function (b) { b.addEventListener('click', function () { close(); pick(b.dataset.k); }); }); } });
       });
       ui.$$('[data-pick]', view).forEach(function (inp) {
@@ -459,8 +535,9 @@
           var f = inp.files && inp.files[0]; inp.value = ''; if (!f) return;
           var to = st.view, msg = $('[data-msg]'), cap = msg.value.trim(), pr = $('[data-sendprog]'), att = $('[data-attach]');
           pr.hidden = false; pr.textContent = 'Preparing ' + (f.name || 'file') + '…'; att.disabled = true;
-          sendAttachment(to, f, cap, function (i, n) { pr.textContent = 'Sending… ' + Math.round(i / n * 100) + '% (' + i + '/' + n + ' parts). Keep MEIKO open.'; })
-            .then(function (r) { msg.value = ''; pr.hidden = true; att.disabled = false; if (!r.sent) ui.toast('Not connected to any relay; the file was not delivered.'); paintChat(); },
+          sendAttachment(to, f, cap, function (i, n) { pr.textContent = 'Sending… ' + Math.round(i / n * 100) + '% (' + i + '/' + n + ' parts). Keep MEIKO open.'; },
+            function (x) { pr.textContent = 'Compressing video… ' + Math.round(x * 100) + '%. Keep MEIKO open.'; })
+            .then(function (r) { msg.value = ''; pr.hidden = true; att.disabled = false; if (!r.sent) ui.toast('Not connected to any relay; the file was not delivered.'); else if (r.cut) ui.toast('Video sent (first ' + VIDEO_MAX_S + ' seconds, ' + r.kb + ' KB).'); paintChat(); },
               function (er) { pr.hidden = true; att.disabled = false; ui.sheet({ title: 'Could not send', html: '<p>' + esc(er.message) + '</p><div class="actions"><button class="btn btn-ghost" data-close>OK</button></div>' }); });
         });
       });

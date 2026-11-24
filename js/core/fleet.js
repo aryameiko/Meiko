@@ -34,7 +34,7 @@
     { code: 6, label: 'Aground', short: 'Aground', icon: '⚠' }
   ];
   function navStatus(code) { return NAV_STATUS.filter(function (x) { return x.code === code; })[0] || null; }
-  var CHUNK = 16000, MAX_FILE = 512 * 1024, MAX_PARTS = Math.ceil(MAX_FILE / CHUNK);
+  var CHUNK = 16000, MAX_FILE = 1024 * 1024, MAX_PARTS = Math.ceil(MAX_FILE / CHUNK);
   var CODE_ALPHA = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
   function normCode(code) { return String(code || '').trim().toUpperCase().replace(/\s+/g, ''); }
