@@ -465,7 +465,7 @@
           '<div class="seg seg-sm" data-mode><button type="button" data-v="pick">' + icon('i-pin') + 'Pick point</button><button type="button" data-v="route">' + icon('i-route') + 'Track</button></div>' +
           '<form class="map-go" data-go novalidate><input data-go-in placeholder="Go to: -6.104, 106.88" aria-label="Go to coordinates" autocomplete="off" spellcheck="false"><button class="icon-btn" aria-label="Go">' + icon('i-search') + '</button></form>' +
         '</div>' +
-        '<div class="map-box map-main" data-mapel></div></div>' +
+        '<div class="map-box map-main" data-mapel></div><div class="live-panel" data-live-panel></div></div>' +
         '<div class="tool-grid mt-12"><div class="stack"><div class="card card-pad" data-panel></div></div>' +
         '<div class="results-col stack"><div class="card card-pad" data-offline-card></div><div class="card card-pad small" data-about></div></div></div>';
 
@@ -509,6 +509,7 @@
       if (!ctl) return;
       bindLayerBar(view, ctl, locErr);
       trk = MEIKO.trackUI.attach(ctl, panel);
+      var lv = MEIKO.liveNav.attach(ctl, ui.$('[data-live-panel]', view));
       offlineCard(view, ctl);
 
       var modeSeg = ui.$('[data-mode]', view);
@@ -545,7 +546,7 @@
 
       var onNet = function () { var o = ui.$('[data-offline]', view); if (o) o.innerHTML = offlineNote(); };
       window.addEventListener('online', onNet); window.addEventListener('offline', onNet);
-      return function () { window.removeEventListener('online', onNet); window.removeEventListener('offline', onNet); ctl.destroy(); };
+      return function () { window.removeEventListener('online', onNet); window.removeEventListener('offline', onNet); lv.destroy(); ctl.destroy(); };
   }
 
   MEIKO.features.register({

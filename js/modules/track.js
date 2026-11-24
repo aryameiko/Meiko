@@ -204,7 +204,8 @@
         h += '<div class="flex mt-12"><button class="btn btn-ghost btn-sm" data-t-copy>' + icon('i-copy') + 'Copy</button>' +
           '<button class="btn btn-ghost btn-sm" data-t-gpx>' + icon('i-route') + 'Export GPX</button>' +
           '<button class="btn btn-ghost btn-sm" data-t-fit>' + icon('i-search') + 'Show all</button>' +
-          '<button class="btn btn-ghost btn-sm" data-t-rev' + (n < 2 ? ' disabled' : '') + '>' + icon('i-swap') + 'Reverse</button></div>';
+          '<button class="btn btn-ghost btn-sm" data-t-rev' + (n < 2 ? ' disabled' : '') + '>' + icon('i-swap') + 'Reverse</button>' +
+          '<button class="btn btn-gold btn-sm" data-t-nav>' + icon('i-gps') + 'Navigate</button></div>';
         h += '<p class="small muted mt-12">' + esc(c.varSource) + ' ' + (d.type === 'gc' ? 'Great-circle legs: the course changes along the leg.' : 'Rhumb-line legs: constant true course along each leg.') + ' ' + esc(ui.NAV_DISCLAIMER) + '</p>';
       }
       panel.innerHTML = h;
@@ -242,6 +243,11 @@
       var cp = $('[data-t-copy]'); if (cp) cp.addEventListener('click', function () { ui.copy(textSummary(d, compute(d)), 'Track copied'); });
       var gx = $('[data-t-gpx]'); if (gx) gx.addEventListener('click', function () { download(fileName(d.name), C.track.toGPX({ name: d.name || 'MEIKO track', points: d.points, updated: new Date().toISOString() }), 'application/gpx+xml'); ui.toast('GPX file downloaded'); });
       var ft = $('[data-t-fit]'); if (ft) ft.addEventListener('click', fit);
+      var nv = $('[data-t-nav]'); if (nv) nv.addEventListener('click', function () {
+        var sp = parseFloat(String(d.speed).replace(',', '.'));
+        MEIKO.liveNav.navigate({ name: d.name || 'Track', points: d.points, plannedKn: isFinite(sp) && sp > 0 ? sp : null });
+        var lp = document.querySelector('[data-live-panel]'); if (lp && lp.scrollIntoView) lp.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      });
       var rv = $('[data-t-rev]'); if (rv) rv.addEventListener('click', function () { d.points.reverse(); selIdx = null; changed(); });
     }
     function onListClick(e) {

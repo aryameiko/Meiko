@@ -418,5 +418,45 @@ test('GPX: reads trk/trkpt and loose wpt, rejects non-GPX', function () {
   assert.strictEqual(track.thin(r[0].points.concat(r[0].points, r[0].points), 3).length, 3);
 });
 
+/* ---------- Live navigation ---------- */
+var live = core('livenav');
+test('Live: COG averages across north (359° & 001° → 000°) and SOG smooths', function () {
+  var sm = live.smoother({ tau: 2 });
+  var t = 0, kn = live.KN;
+  sm.push({ lat: 0, lon: 0, speed: 10 * kn, heading: 359, timestamp: t });
+  var st;
+  for (var i = 1; i <= 20; i++) st = sm.push({ lat: 0, lon: 0, speed: (i % 2 ? 12 : 8) * kn, heading: i % 2 ? 1 : 359, timestamp: t + i * 1000 });
+  assert.ok(Math.abs(live.angDiff(st.cog, 0)) < 1, 'cog ' + st.cog);
+  near(st.sogKn, 10, 1.5);
+});
+test('Live: COG is hidden when stopped; speed/course derived from fixes when missing', function () {
+  var sm = live.smoother({ tau: 1 });
+  sm.push({ lat: 0, lon: 0, speed: 0, heading: 90, timestamp: 0 });
+  assert.strictEqual(sm.state().cog, null);
+  var sm2 = live.smoother({ tau: 0.001 });
+  sm2.push({ lat: 0, lon: 0, accuracy: 5, timestamp: 0 });
+  var st = sm2.push({ lat: 0, lon: 0.001, accuracy: 5, timestamp: 10000 }); // ~111 m east in 10 s
+  near(st.sogKn, 111.2 / 10 / live.KN, 0.2); near(st.cog, 90, 0.01);
+});
+test('Live: cross-track sign (+ right of track) and along-track distance', function () {
+  var a = { lat: 0, lon: 0 }, b = { lat: 0, lon: 1 }; // leg due east
+  var r = live.crossTrack(a, b, { lat: -0.01, lon: 0.5 }); // south of an eastbound leg = right
+  assert.ok(r.xte > 0); near(r.xte, 1111.95, 1); near(r.atd, 55597.5, 5);
+  assert.ok(live.crossTrack(a, b, { lat: 0.01, lon: 0.5 }).xte < 0);
+});
+test('Live: BRG/DTW/XTE, ETA from SOG with planned-speed fallback, arrival', function () {
+  var pts = [{ lat: 0, lon: 0 }, { lat: 0, lon: 1 }, { lat: 1, lon: 1 }];
+  var own = { lat: 0, lon: 0.5, sogKn: 10, cog: 90 };
+  var r = live.follow(pts, 1, own, { now: 0 });
+  near(r.brg, 90, 0.01); near(r.dtwNM, 30.02, 0.02); near(r.xteM, 0, 0.01); near(r.vmgKn, 10, 1e-9);
+  near(r.hoursNext, r.dtwNM / 10, 1e-12); near(r.toEndNM, r.dtwNM + 60.04, 0.02); assert.strictEqual(r.speedSource, 'sog'); assert.ok(!r.arrived);
+  var r2 = live.follow(pts, 1, { lat: 0, lon: 0.5, sogKn: 0.2, cog: null }, { plannedKn: 6, now: 0 });
+  assert.strictEqual(r2.speedSource, 'planned'); near(r2.hoursNext, r2.dtwNM / 6, 1e-12);
+  assert.ok(live.follow(pts, 1, { lat: 0.0003, lon: 0.9996 }, {}).arrived, 'inside radius');
+  assert.ok(live.follow(pts, 1, { lat: -0.02, lon: 1.01 }, {}).arrived, 'passed the perpendicular');
+  assert.strictEqual(live.startIndex(pts, { lat: 0.5, lon: 1.01 }), 2);
+  assert.strictEqual(live.startIndex(pts, { lat: 0, lon: -1 }), 0);
+});
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed\n');
 process.exit(failed ? 1 : 0);

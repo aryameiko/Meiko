@@ -31,6 +31,9 @@
 
   /* ---------------- Phone / tablet GPS (Geolocation API) ---------------- */
   function explain(err) {
+    var e = explainMsg(err); if (err && err.code) e.code = err.code; return e;
+  }
+  function explainMsg(err) {
     if (!window.isSecureContext) return new Error('Location needs a secure (https) connection. Open MEIKO over https or from localhost, or enter coordinates manually.');
     if (!('geolocation' in navigator)) return new Error('This device or browser does not support GPS location. Enter coordinates manually or connect an external GPS receiver.');
     switch (err && err.code) {

@@ -97,6 +97,23 @@ The vessel avatar is in `js/modules/vessel.js`, in the Settings category. Users 
 - **Dashboard:** the hero shows the avatar and name, or a "Create your vessel" link if none is set.
 - **Map:** the vessel is the own-ship GPS marker, rotated to course over ground when the fix has a heading and the speed is above 0.5 m/s. Otherwise it shows a side-view badge.
 
+## Live navigation (v1.6)
+
+The live navigation panel sits under the map, on both the Map page and the Track Planner. The UI is `js/modules/livenav.js` and the maths is `js/core/livenav.js`, which has unit tests.
+
+- **Start GPS:** continuous GPS from the phone or an external receiver, with the screen kept awake (Wake Lock) where supported. It shows:
+  - COG and SOG in knots, smoothed over about 5 s. COG is a speed-weighted vector average, so it handles the 359°/001° wrap and is held when stopped.
+  - The position.
+  - If the fix has no speed or course, they are derived from consecutive fixes.
+- **Following a track:** start it with *Navigate* in the Track Planner, or *Follow a track* in the panel. It shows:
+  - Next waypoint, BRG, DTW, and XTE (+ means right of track), with steering hints.
+  - VMG.
+  - ETA to the next and the last waypoint, from live SOG, or the planned speed when SOG is under 0.5 kn.
+  - Distance to the end.
+- **Waypoint advance:** automatic on arrival, inside the arrival radius (default 0.05 NM) or once past the perpendicular at the waypoint, with a toast and a vibration. There are also manual previous/next buttons.
+- **Signal loss:** the panel keeps showing the last fix and keeps trying.
+- **Saved state:** the route being followed is stored under `nav:active`, so it survives reloads and works offline.
+
 ## Accuracy & data status
 
 - **Port coordinates: sample / unverified.** Approximate harbour positions; each record has `verified: false`. Verify against official charts / port authority data, then set `verified: true` and `source`.
