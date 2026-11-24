@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kebijakan Privasi · MEIKO</title>
+  <meta name="description" content="Kebijakan Privasi aplikasi MEIKO: data apa yang dikumpulkan, untuk apa, ke mana dikirim, dan hak Anda.">
+  <link rel="icon" href="assets/icons/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/legal.css">
+</head>
+<body>
+<main id="legal" class="legal" data-legal-version="2026-11-24">
+<h1>Kebijakan Privasi MEIKO</h1>
+<p class="legal-meta">Berlaku sejak 24 November 2026 · Versi 2026-11-24</p>
+
+<p>Kebijakan ini menjelaskan data pribadi apa yang diproses aplikasi MEIKO (situs <b>aryameiko.github.io/Meiko</b> dan aplikasi yang dipasang darinya), untuk apa, ke mana data itu dikirim, berapa lama disimpan, dan apa hak Anda. Kebijakan ini disusun dengan mengacu pada Undang-Undang Nomor 27 Tahun 2022 tentang Pelindungan Data Pribadi (UU PDP).</p>
+
+<h2>1. Siapa pengendali data</h2>
+<p>Pengendali data pribadi adalah pengembang MEIKO, pemilik proyek <a href="https://github.com/aryameiko/meiko" target="_blank" rel="noopener">github.com/aryameiko/meiko</a>. Untuk pertanyaan, permintaan hak, atau laporan masalah privasi, hubungi kami melalui <a href="https://github.com/aryameiko/meiko/issues" target="_blank" rel="noopener">halaman Issues proyek</a> (jangan tulis data pribadi Anda di sana; cukup minta kami menghubungi Anda).</p>
+
+<h2>2. Ringkasan singkat</h2>
+<ul>
+  <li>Akun Anda (email dan kata sandi, atau akun Google) dikelola oleh <b>Firebase Authentication</b> milik Google.</li>
+  <li>Hampir semua data lain (pengaturan, posisi GPS, rute, tempat tersimpan, kapal, riwayat chat) <b>disimpan di perangkat Anda saja</b>.</li>
+  <li>Posisi kapal dan chat hanya dikirim jika Anda <b>sendiri</b> bergabung ke grup Fleet &amp; Chat. Isinya <b>dienkripsi ujung ke ujung</b> sebelum dikirim.</li>
+  <li>MEIKO <b>tidak</b> memakai iklan, pelacak analitik, atau menjual data.</li>
+</ul>
+
+<h2>3. Data yang kami proses dan tujuannya</h2>
+<table>
+  <thead><tr><th>Data</th><th>Tujuan</th><th>Dasar pemrosesan</th><th>Disimpan di</th></tr></thead>
+  <tbody>
+    <tr><td>Alamat email, kata sandi (disimpan Firebase dalam bentuk hash), ID pengguna, waktu daftar dan masuk. Jika memakai Google: nama, email, dan foto profil Google yang dikirim Google.</td><td>Membuat akun, masuk, mengatur ulang kata sandi, mencegah penyalahgunaan.</td><td>Persetujuan Anda dan pelaksanaan perjanjian (Syarat Penggunaan).</td><td>Firebase (Google LLC) dan perangkat Anda.</td></tr>
+    <tr><td>Nama panggilan (nickname) dan avatar kapal (jenis, warna, nama kapal, tanda panggil, pelabuhan asal).</td><td>Menampilkan identitas Anda di aplikasi dan, jika Anda bergabung, kepada anggota grup Fleet &amp; Chat.</td><td>Persetujuan.</td><td>Perangkat Anda; dikirim terenkripsi ke grup Fleet jika Anda bergabung.</td></tr>
+    <tr><td>Lokasi GPS, haluan dan kecepatan, kompas.</td><td>Fitur navigasi, peta, kiblat, waktu salat. Diproses di perangkat.</td><td>Persetujuan (izin lokasi di browser/HP, bisa dicabut kapan saja).</td><td>Perangkat Anda. Hanya dikirim jika Anda menyalakan “Bagikan posisi” di Fleet &amp; Chat.</td></tr>
+    <tr><td>Rute, titik jalan, tempat tersimpan, area peta offline, pengaturan.</td><td>Menjalankan fitur yang Anda pakai.</td><td>Persetujuan / pelaksanaan perjanjian.</td><td>Perangkat Anda saja.</td></tr>
+    <tr><td>Pesan, foto, video, dan berkas di Fleet &amp; Chat; kunci perangkat Fleet.</td><td>Mengirim pesan kepada anggota grup yang Anda pilih.</td><td>Persetujuan.</td><td>Perangkat Anda dan anggota grup; dalam bentuk terenkripsi di relay Nostr publik (lihat bagian 4).</td></tr>
+    <tr><td>Foto langit untuk fitur Foto Bintang.</td><td>Mengenali bintang. Diproses di perangkat, tidak diunggah.</td><td>Persetujuan.</td><td>Perangkat Anda (tidak disimpan setelah diproses).</td></tr>
+    <tr><td>Alamat IP dan data teknis permintaan jaringan.</td><td>Otomatis terkirim ke layanan pihak ketiga saat aplikasi memuat peta, masuk akun, atau memakai Fleet &amp; Chat.</td><td>Kepentingan yang sah untuk menjalankan layanan.</td><td>Server pihak ketiga (lihat bagian 4), sesuai kebijakan mereka.</td></tr>
+  </tbody>
+</table>
+<p>Kami tidak meminta dan tidak sengaja memproses data pribadi yang bersifat spesifik (misalnya data kesehatan, biometrik, keuangan, atau data anak) di luar yang Anda tulis sendiri di chat.</p>
+
+<h2>4. Pihak ketiga yang menerima data</h2>
+<ul>
+  <li><b>Google LLC – Firebase Authentication</b> (pemroses data): menyimpan akun. Server Google dapat berada di luar Indonesia, termasuk Amerika Serikat. <a href="https://firebase.google.com/support/privacy" target="_blank" rel="noopener">Privasi Firebase</a> · <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Kebijakan Privasi Google</a>.</li>
+  <li><b>Relay Nostr publik</b> (bawaan: relay.damus.io, nos.lol, relay.primal.net, offchain.pub; Anda dapat menggantinya): meneruskan pesan dan posisi Fleet &amp; Chat. Relay ini dijalankan pihak independen di berbagai negara dan <b>bukan milik MEIKO</b>. Isi pesan, posisi, nama panggilan, dan lampiran dienkripsi dengan kode grup sebelum dikirim, sehingga relay tidak dapat membacanya. Relay tetap dapat melihat alamat IP, kunci publik perangkat, waktu, dan ukuran data. Pesan diberi masa berlaku 3 hari, tetapi kami tidak dapat menjamin setiap relay menghapusnya tepat waktu.</li>
+  <li><b>Penyedia peta</b>: OpenStreetMap Foundation (peta jalan), Esri (citra satelit dan nama tempat), dan OpenSeaMap (rambu laut). Saat peta dimuat, server mereka menerima alamat IP Anda dan petak peta yang diminta (yang menunjukkan area yang sedang Anda lihat).</li>
+  <li><b>GitHub, Inc.</b>: menyajikan berkas aplikasi (GitHub Pages) dan dapat mencatat alamat IP pengunjung. <a href="https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement" target="_blank" rel="noopener">Pernyataan Privasi GitHub</a>.</li>
+  <li><b>Tautan keluar</b> (misalnya “Buka di Google Maps/Earth”) membuka layanan pihak ketiga dengan koordinat yang Anda pilih; layanan itu tunduk pada kebijakan mereka sendiri.</li>
+</ul>
+<p>Kami tidak menjual, menyewakan, atau membagikan data pribadi Anda untuk iklan.</p>
+
+<h2>5. Transfer data ke luar Indonesia</h2>
+<p>Firebase, relay Nostr, penyedia peta, dan GitHub dapat memproses data di luar wilayah Indonesia. Sesuai Pasal 56 UU PDP, kami memilih penyedia yang menerapkan pelindungan data yang memadai (misalnya perjanjian pemrosesan data Google untuk Firebase), dan untuk Fleet &amp; Chat kami mengenkripsi isi data sebelum keluar dari perangkat Anda. Dengan memberikan persetujuan, Anda menyetujui transfer tersebut.</p>
+
+<h2>6. Berapa lama data disimpan</h2>
+<ul>
+  <li><b>Akun Firebase</b>: sampai Anda menghapus akun (Pengaturan → Akun → Hapus akun) atau meminta penghapusan.</li>
+  <li><b>Data di perangkat</b>: sampai Anda menghapusnya (Pengaturan → Hapus semua data lokal, hapus akun, atau hapus data situs di browser).</li>
+  <li><b>Chat di relay</b>: diberi masa berlaku 3 hari; posisi langsung bersifat sementara (tidak disimpan relay yang patuh standar).</li>
+</ul>
+
+<h2>7. Hak Anda</h2>
+<p>Sesuai UU PDP, Anda berhak antara lain untuk: mendapat informasi tentang pemrosesan data; mengakses dan memperoleh salinan data; memperbaiki data yang salah; menghapus data dan mengakhiri pemrosesan; menarik kembali persetujuan; membatasi atau menunda pemrosesan; dan mengajukan keberatan atau gugatan sesuai peraturan.</p>
+<p>Cara memakai hak Anda:</p>
+<ul>
+  <li><b>Ubah nama panggilan atau kapal</b>: Pengaturan → Akun / Kapal Saya.</li>
+  <li><b>Berhenti membagikan posisi</b>: matikan “Bagikan posisi” atau keluar dari grup di Fleet &amp; Chat.</li>
+  <li><b>Cabut izin lokasi/kamera</b>: lewat pengaturan browser atau HP.</li>
+  <li><b>Hapus akun dan data</b>: Pengaturan → Akun → <b>Hapus akun</b>. Ini menghapus akun Firebase Anda dan data MEIKO di perangkat ini.</li>
+  <li><b>Permintaan lain</b> (salinan data, keberatan, dll.): hubungi kami (bagian 1). Kami menjawab paling lambat 3 × 24 jam sejak permintaan diterima, sesuai UU PDP.</li>
+</ul>
+<p>Menarik persetujuan untuk akun berarti Anda tidak dapat lagi memakai fitur yang memerlukan akun.</p>
+
+<h2>8. Keamanan</h2>
+<p>Koneksi memakai HTTPS/WSS. Kata sandi dikelola Firebase dan tidak pernah kami simpan. Isi Fleet &amp; Chat dienkripsi (AES-GCM; chat pribadi dienkripsi lagi dengan kunci antarperangkat). Meski begitu, tidak ada sistem yang aman 100%. Siapa pun yang mengetahui kode grup dapat membaca isi grup tersebut, jadi bagikan kode hanya kepada orang yang Anda percaya. Jika terjadi kegagalan pelindungan data pribadi, kami akan memberi tahu Anda dan otoritas terkait paling lambat 3 × 24 jam sesuai Pasal 46 UU PDP.</p>
+
+<h2>9. Anak-anak</h2>
+<p>MEIKO tidak ditujukan untuk anak. Jika Anda berusia di bawah 18 tahun, Anda hanya boleh mendaftar dengan persetujuan dan pengawasan orang tua atau wali (Pasal 25 UU PDP). Jika kami mengetahui ada akun anak tanpa persetujuan tersebut, akun itu dapat kami hapus.</p>
+
+<h2>10. Perubahan kebijakan</h2>
+<p>Jika kebijakan ini berubah secara penting, kami akan memberi tahu di aplikasi dan meminta persetujuan Anda lagi bila diperlukan. Tanggal versi tercantum di bagian atas.</p>
+
+<p class="legal-foot"><a href="terms.html">Syarat Penggunaan</a> · <a href="./">Kembali ke MEIKO</a></p>
+</main>
+</body>
+</html>

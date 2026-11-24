@@ -767,3 +767,10 @@ body.onb-open { overflow: hidden; }
 .onb-google .g-logo { width: 20px; height: 20px; flex: none; }
 .onb-or { display: flex; align-items: center; gap: 10px; margin: 14px 0 10px; color: var(--muted); font-size: 12.5px; }
 .onb-or::before, .onb-or::after { content: ''; flex: 1; height: 1px; background: var(--border, rgba(127,127,127,.3)); }
+
+/* Legal: consent checkbox (onboarding) and sheets shown above the onboarding screen */
+.onb-consent { margin: 4px 0 14px; }
+.legal-check { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; line-height: 1.5; color: var(--text-2); cursor: pointer; }
+.legal-check input { width: 20px; height: 20px; flex: none; margin: 1px 0 0; accent-color: var(--navy-700); }
+.legal-check a { color: var(--focus); }
+body.onb-open .sheet-backdrop { z-index: 5100; }
