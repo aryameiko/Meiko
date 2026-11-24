@@ -320,7 +320,7 @@
   MEIKO.gps = {
     getPosition: getPosition, watch: watch, stop: stop, quality: quality,
     last: function () { return last; }, isWatching: function () { return watchId != null || !!extWatch; },
-    onFix: function (fn) { listeners.push(fn); },
+    onFix: function (fn) { listeners.push(fn); }, offFix: function (fn) { listeners = listeners.filter(function (x) { return x !== fn; }); },
     source: pref, platform: platform, permissionState: permissionState, requestPermission: requestPermission, watchPermission: watchPermission,
     external: {
       support: support, status: status, connectSerial: connectSerial, connectBluetooth: connectBluetooth,

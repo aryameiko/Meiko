@@ -7,7 +7,7 @@
   'use strict';
   var tools = [], byId = {};
   var CATEGORIES = [
-    { id: 'navigation', icon: 'i-nav', desc: 'Track planner, course & bearing, port to port' },
+    { id: 'navigation', icon: 'i-nav', desc: 'Track planner, course & bearing, port to port, fleet & chat' },
     { id: 'calculator', icon: 'i-calc', desc: 'Calculator, distance, rhumb line, ETA, speed/distance/time, coordinates' },
     { id: 'converter', icon: 'i-convert', desc: 'Maritime, speed, length, time, angle, temperature' },
     { id: 'astronomy', icon: 'i-sun', desc: 'Meridian passage, sunrise and sunset' },

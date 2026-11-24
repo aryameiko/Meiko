@@ -126,6 +126,15 @@ Three tools under **Astronomy**, all offline:
 
 Star positions use GMST (IAU 1982) and precession (IAU 1976). Nutation, aberration and proper motion are ignored, which leaves an error of about 1′. Data come from d3-celestial (BSD-3, HYG/Hipparcos); see `js/data/LICENSE-d3-celestial`.
 
+## Fleet & Chat (v1.9.0)
+
+**Fleet & Chat** (Navigation menu) lets vessels that enter the same group code see each other on a map (name, vessel avatar, COG/SOG, last seen) and chat. There is no MEIKO server and no account: messages go through free public Nostr relays (`wss://relay.damus.io`, `nos.lol`, `relay.primal.net`, `offchain.pub`; editable under *How it works*).
+
+- **Privacy.** A key is derived from the group code (PBKDF2-SHA-256) and everything is encrypted with AES-GCM, so relays only see a random-looking tag and ciphertext. Anyone with the code can read the group. Position sharing is off until the user switches it on.
+- **Behaviour.** Positions are sent every 30 s while MEIKO is open and are not stored by relays. Chat is stored by relays for up to 2 days (NIP-40 expiry) so late joiners can read it, and the last 100 messages stay on the device. Online = heard from in the last 3 minutes.
+- **Limits.** Both sides need internet; public relays can be slow or down; phones pause web apps in the background. It is not a safety or distress system: use VHF/DSC and AIS. A commercial version with guaranteed delivery and history would need a proper backend (for example Firebase or Supabase under the owner's account).
+- **Code.** Protocol and crypto in `js/core/fleet.js` (tests in `tests/fleet-tests.js` with an in-memory relay), UI in `js/modules/fleet.js`, signing library bundled in `js/vendor/nostr-crypto.js` (@noble/curves + @noble/hashes, MIT).
+
 ## Course & Bearing map (v1.8.5)
 
 **Course & Bearing** has a map under the two positions. Tap the map to set A (departure) and then B (destination), or type the positions. The map shows the great circle (solid, with direction arrows), the rhumb line (dashed), the initial course at A and the final bearing at B. It works offline on the bundled outline map.

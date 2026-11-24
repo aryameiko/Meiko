@@ -552,5 +552,10 @@ test('Ports: no position more than 4 km inland (Natural Earth 10m coast; river p
   assert.deepStrictEqual(estimates.sort(), ['id-miangas', 'id-ranai', 'id-tratai', 'tl-dili']);
 });
 
-console.log('\n' + passed + ' passed, ' + failed + ' failed\n');
-process.exit(failed ? 1 : 0);
+console.log('\nFleet & Chat');
+require('./fleet-tests.js')(function (name, fn) {
+  return Promise.resolve().then(fn).then(function () { passed++; console.log('  ✓ ' + name); }, function (e) { failed++; console.log('  ✗ ' + name + '\n      ' + e.message); });
+}).then(function () {
+  console.log('\n' + passed + ' passed, ' + failed + ' failed\n');
+  process.exit(failed ? 1 : 0);
+});
