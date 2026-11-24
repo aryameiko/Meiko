@@ -86,6 +86,10 @@ module.exports = function run(test) {
     assert.strictEqual(fleet.sanitize({ k: 'chat', text: '   ' }), null);
     assert.strictEqual(fleet.sanitize({ k: 'chat', text: 'y'.repeat(900) }).text.length, 500);
   });
+  t('Fleet: hidden direction marks cannot disguise a file name or a vessel name', function () {
+    var p = fleet.sanitize({ k: 'chat', name: 'Ba\u200Bsar\u202Enas', text: 'x', att: { fid: '0123456789abcdef', name: 'photo\u202Egpj.apk', mime: 'application/vnd.android.package-archive', size: 100, n: 1 } });
+    assert.strictEqual(p.name, 'Basarnas'); assert.strictEqual(p.att.name, 'photogpj.apk');
+  });
   t('Fleet: two vessels in the same group see each other\'s position and chat; another group sees nothing', function () {
     var relay = new MockRelay();
     var a = client(relay, 'MEIKO-SAME-0001'), b = client(relay, 'meiko-same-0001'), x = client(relay, 'MEIKO-OTHR-0002');

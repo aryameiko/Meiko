@@ -115,7 +115,9 @@
   function shortId(pub) { return String(pub || '').slice(0, 4).toUpperCase() + '·' + String(pub || '').slice(4, 8).toUpperCase(); }
 
   /* -------- payload validation: everything received is untrusted -------- */
-  function str(v, max) { return typeof v === 'string' ? v.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, max) : ''; }
+  /* Control characters, and invisible direction / zero-width marks that can disguise a name or a file
+   * extension (e.g. "photo\u202Egpj.apk" shows as "photokpa.jpg"). */
+  function str(v, max) { return typeof v === 'string' ? v.replace(/[\u0000-\u001f\u007f-\u009f]/g, ' ').replace(/[\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufeff]/g, '').trim().slice(0, max) : ''; }
   function num(v, lo, hi) { return typeof v === 'number' && isFinite(v) && v >= lo && v <= hi ? v : null; }
   function colour(v) { return typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v) ? v : null; }
   function sanitize(p) {
@@ -216,7 +218,7 @@
     function handle(ev) {
       if (!ev || (ev.kind !== KIND_LIVE && ev.kind !== KIND_CHAT) || !Array.isArray(ev.tags)) return;
       var tagged = ev.tags.some(function (t) { return Array.isArray(t) && t[0] === 't' && t[1] === room.tag; });
-      if (!tagged || typeof ev.id !== 'string' || !remember(ev.id)) return;
+      if (!tagged || typeof ev.id !== 'string' || typeof ev.created_at !== 'number' || !isFinite(ev.created_at) || !remember(ev.id)) return;
       if (!verifyEvent(nc, ev)) return;
       decrypt(subtle, room.key, ev.content).then(function (raw) {
         var p = sanitize(raw); if (!p || stopped) return;

@@ -369,7 +369,7 @@
       dt.value = toLocalInput(Date.now(), +tzEl.value);
       function saveOpts() { MEIKO.storage.set('starphoto:opts', { hoe: hoe.value, tz: +tzEl.value }); }
       hoe.addEventListener('input', function () { saveOpts(); results(); }); tzEl.addEventListener('change', function () { saveOpts(); results(); });
-      dt.addEventListener('change', results); view.addEventListener('change', function (e) { if (e.target.name && /^p-/.test(e.target.name)) results(); });
+      dt.addEventListener('change', results); var pageEl = view.firstElementChild; view.addEventListener('change', function (e) { if (pageEl && pageEl.isConnected && e.target.name && /^p-/.test(e.target.name)) results(); });
       var st = null; // { img, cv, sol, cons, hz:[], marking }
 
       ui.$('[data-file]', view).addEventListener('change', function (e) {

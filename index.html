@@ -2,6 +2,7 @@
 <html lang="en" class="in-app">
 <head>
   <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://apis.google.com https://www.google.com https://www.gstatic.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://tile.openstreetmap.org https://server.arcgisonline.com https://tiles.openseamap.org https://*.googleusercontent.com; media-src 'self' blob:; connect-src 'self' data: blob: https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://apis.google.com https://tile.openstreetmap.org https://server.arcgisonline.com https://tiles.openseamap.org wss: ws:; frame-src https://meiko-33002.firebaseapp.com https://apis.google.com https://www.google.com https://accounts.google.com; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>MEIKO</title>
   <meta name="description" content="MEIKO: maritime navigation and everyday utility tools. Great circle and rhumb line distance, ETA, coordinates, merpass, sunrise, Maghrib, Qibla and GPS. Works offline.">
@@ -17,10 +18,7 @@
   <link rel="stylesheet" href="assets/vendor/leaflet/leaflet.css">
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="css/legal.css">
-  <script>
-    // Apply saved theme before first paint to avoid a flash.
-    try { var t = JSON.parse(localStorage.getItem('meiko:v1:settings') || '{}').theme; if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {}
-  </script>
+  <script src="js/theme-boot.js"></script>
 </head>
 <body>
   <!-- Icon sprite: 24×24 stroke icons -->

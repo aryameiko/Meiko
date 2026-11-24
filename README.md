@@ -153,6 +153,14 @@ Paste the Firebase web config into `js/firebase-config.js` (`MEIKO.FIREBASE_CONF
 - **General Group**: the public fleet's group chat, opt-in (`cfg.general`, *Join General Group*). Not private (public key), not moderated: tap a name → **Block** (`cfg.blocked`, hides vessel and messages on this phone) or **Report** (prefilled GitHub issue with the vessel ID). Private groups with a code still exist.
 - Privacy Policy and Terms updated (version `2026-11-24.2`); signed-in users are asked to agree once more.
 
+## Security (v1.13.2)
+
+- **Content-Security-Policy** in `index.html` (and the legal pages): scripts only from MEIKO itself and Google sign-in (`apis.google.com`, `www.google.com`, `www.gstatic.com`), no inline scripts (the theme pre-paint script moved to `js/theme-boot.js`), no plugins, no `<base>` change. Images/tiles only from the map hosts, `data:` and `blob:`; network only to Firebase Auth, the map hosts and `ws:`/`wss:` (Nostr relays, network GPS). When you add a new outside service, add its host to the policy or it is blocked.
+- **Service worker:** only a good copy of the app page itself is kept as the offline page (before, opening `privacy.html` or getting an error page could replace it). Only same-origin, successful responses are cached.
+- **Fleet & Chat:** names and file names lose invisible direction / zero-width characters (they could disguise `photo\u202Egpj.apk` as `photokpa.jpg`); events with a non-numeric time are ignored. Saving a received file that is not a photo or video asks first, with a strong warning for program files (`.apk`, `.exe`, `.html`, `.svg`, …): MEIKO cannot scan files for viruses.
+- Fleet page: a tap no longer opens two sheets after you leave and return to Fleet & Chat (click listeners from earlier visits now ignore clicks).
+- Vendor files checked against npm: `leaflet@1.9.4` (js, css) and `topojson-client@3.1.0` are byte-identical to the official packages.
+
 ## Fixes (v1.13.1)
 
 - **Fleet flood guard:** the public fleet is open to everyone, so at most 8 messages per vessel per minute are accepted (group and private); more are dropped.

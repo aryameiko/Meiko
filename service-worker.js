@@ -4,9 +4,9 @@
  * cache-first with a background refresh ("stale-while-revalidate") for same-origin GET requests.
  * Bump CACHE_VERSION whenever any file changes so clients pick up the new version.
  */
-var CACHE_VERSION = 'meiko-v1.13.1';
+var CACHE_VERSION = 'meiko-v1.13.2';
 var ASSETS = [
-  './', 'index.html', 'manifest.json', 'css/style.css',
+  './', 'index.html', 'js/theme-boot.js', 'manifest.json', 'css/style.css',
   'assets/icons/icon.svg', 'assets/icons/icon-192.png', 'assets/icons/icon-512.png', 'assets/icons/icon-maskable-512.png', 'assets/icons/apple-touch-icon.png', 'assets/icons/logo-round.png', 'assets/icons/logo-full.jpg',
   'js/firebase-config.js', 'js/vendor/firebase-auth.js', 'js/auth.js', 'js/onboarding.js', 'js/modules/account.js', 'js/modules/legal.js', 'privacy.html', 'terms.html', 'css/legal.css', 'js/core/geo.js', 'js/core/coords.js', 'js/core/units.js', 'js/core/navcalc.js', 'js/core/solar.js', 'js/core/prayer.js', 'js/core/qibla.js', 'js/core/calc.js', 'js/core/nmea.js', 'js/core/track.js', 'js/core/wmm.js', 'js/core/livenav.js', 'js/core/celestial.js', 'js/core/platesolve.js', 'js/core/seadist.js', 'js/core/fleet.js', 'js/vendor/nostr-crypto.js',
   'js/data/ports-data.js', 'js/data/stars-data.js', 'js/data/distance-tables.js',
@@ -65,16 +65,19 @@ self.addEventListener('fetch', function (event) {
 
   if (req.mode === 'navigate') {
     // App shell: network first (fresh when online), fall back to cached index.html offline.
+    // Only a good copy of the app page itself replaces the offline copy: never an error page, a
+    // redirect, or another page such as privacy.html (that would show the wrong page offline).
+    var shell = /\/(index\.html)?$/.test(url.pathname);
     event.respondWith(fetch(req).then(function (res) {
-      var copy = res.clone(); caches.open(CACHE_VERSION).then(function (c) { c.put('index.html', copy); });
+      if (shell && res.ok && res.type === 'basic' && !res.redirected) { var copy = res.clone(); caches.open(CACHE_VERSION).then(function (c) { c.put('index.html', copy); }); }
       return res;
-    }).catch(function () { return caches.match('index.html'); }));
+    }).catch(function () { return caches.match(shell ? 'index.html' : req, { ignoreSearch: true }).then(function (r) { return r || caches.match('index.html'); }); }));
     return;
   }
 
   event.respondWith(caches.match(req, { ignoreSearch: true }).then(function (cached) {
     var network = fetch(req).then(function (res) {
-      if (res && res.ok) { var copy = res.clone(); caches.open(CACHE_VERSION).then(function (c) { c.put(req, copy); }); }
+      if (res && res.ok && res.type === 'basic') { var copy = res.clone(); caches.open(CACHE_VERSION).then(function (c) { c.put(req, copy); }); }
       return res;
     }).catch(function () { return cached; });
     return cached || network;

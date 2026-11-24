@@ -534,6 +534,10 @@
       var $ = function (s) { return ui.$(s, view); };
       var fm = null, lay = null;
       function alive() { return document.body.contains(view) && $('[data-fleet-page]'); }
+      /* #view stays the same element when the user leaves and comes back, so a click listener added on an
+       * earlier visit must ignore clicks once its own page is gone (otherwise one tap opens two sheets). */
+      var page = $('[data-fleet-page]');
+      function onClick(fn) { view.addEventListener('click', function (e) { if (page.isConnected) fn(e); }); }
       function paintMode() {
         var joined = !!st.client;
         var pub = isPublic();
@@ -612,7 +616,7 @@
             var md = /^(image|video)\//.test(el.dataset.mime);
             if (/^image\//.test(el.dataset.mime)) { el.innerHTML = '<img alt="' + esc(el.dataset.name) + '" src="' + f.url + '">'; el.querySelector('img').addEventListener('load', function () { var box = $('[data-chat]'); if (box.dataset.stick) box.scrollTop = box.scrollHeight; }); }
             else if (/^video\//.test(el.dataset.mime)) el.innerHTML = '<video controls playsinline preload="metadata" src="' + f.url + '#t=0.1" aria-label="' + esc(el.dataset.name) + '"></video>';
-            el.insertAdjacentHTML('beforeend', '<a class="att-dl" href="' + f.url + '" download="' + esc(el.dataset.name) + '">' + icon('i-download') + (md ? '' : 'Save') + '</a>');
+            el.insertAdjacentHTML('beforeend', '<a class="att-dl" href="' + f.url + '" download="' + esc(el.dataset.name) + '"' + (md ? '' : ' data-warn="1"') + '>' + icon('i-download') + (md ? '' : 'Save') + '</a>');
             var st0 = el.querySelector('.att-state'); if (st0) st0.remove();
           });
         });
@@ -662,7 +666,7 @@
       });
       var tick = setInterval(function () { if (!alive()) { clearInterval(tick); return; } paintPeers(); paintStatus(); }, 20000);
 
-      view.addEventListener('click', function (e) {
+      onClick(function (e) {
         if (e.target.closest('[data-genjoin]')) { setGeneral(true); return; }
         if (e.target.closest('[data-unblock]')) { saveCfg({ blocked: [] }); ui.toast('All vessels unblocked'); return; }
         if (e.target.closest('[data-genleave]')) { setGeneral(false); return; }
@@ -679,7 +683,7 @@
       });
       $('[data-leave]').addEventListener('click', function () { if (fm) { try { fm.map.remove(); } catch (e) {} } fm = null; lay = null; leave(); });
       $('[data-ns]').addEventListener('change', function (e) { setNS(e.target.value === '' ? null : +e.target.value); });
-      view.addEventListener('click', function (e) { var b = e.target.closest('[data-setns]'); if (b) { setNS(+b.dataset.setns); st.slowSince = 0; st.lastMove = Date.now(); } });
+      onClick(function (e) { var b = e.target.closest('[data-setns]'); if (b) { setNS(+b.dataset.setns); st.slowSince = 0; st.lastMove = Date.now(); } });
       function setNS(v) { saveCfg({ ns: v }); beat(); paintStatus(); var x = v != null && C.fleet.navStatus(v); ui.toast(x ? 'Status: ' + x.label : 'Status cleared'); }
       $('[data-share]').addEventListener('change', function (e) { setShare(e.target.checked); });
       $('[data-share-code]').addEventListener('click', function () {
@@ -728,12 +732,27 @@
               function (er) { pr.hidden = true; att.disabled = false; ui.sheet({ title: 'Could not send', html: '<p>' + esc(er.message) + '</p><div class="actions"><button class="btn btn-ghost" data-close>OK</button></div>' }); });
         });
       });
-      view.addEventListener('click', function (e) {
+      onClick(function (e) {
+        var dl = e.target.closest('a.att-dl[data-warn]');
+        if (dl && !dl.dataset.ok) { e.preventDefault(); fileWarning(dl); return; }
         var im = e.target.closest('.att-img img'); if (im) { ui.sheet({ title: im.alt || 'Photo', html: '<img class="att-full" src="' + im.src + '" alt="">' }); return; }
         var tb = e.target.closest('[data-tab]'); if (tb) { st.view = tb.dataset.tab; paintChat(); return; }
         var d = e.target.closest('[data-dm]'); if (d) { openDM(d.dataset.dm); return; }
         var b = e.target.closest('[data-peer]'); if (b) tapVessel(b.dataset.peer);
       });
+      /* Files other than photos and videos can carry viruses (an Android app, a document with macros, a web
+       * page). MEIKO cannot scan them, so the user confirms before saving, with a stronger warning for
+       * file types that run code. */
+      function fileWarning(a) {
+        var name = a.getAttribute('download') || 'file', ext = (name.match(/\.([a-z0-9]{1,8})$/i) || [])[1] || '';
+        var danger = /^(apk|xapk|apks|aab|exe|msi|bat|cmd|com|scr|pif|vbs|vbe|js|jse|jar|wsf|ps1|sh|bin|run|dmg|pkg|app|ipa|deb|rpm|html?|xhtml|svg|hta|lnk|reg|dll|docm|xlsm|pptm|iso|img)$/i.test(ext);
+        ui.sheet({ title: danger ? 'Dangerous file type' : 'Save this file?', html:
+          ui.notice(danger ? 'err' : 'warn', '<b>' + esc(name) + '</b><br>' + (danger
+            ? 'This kind of file can install or run a program on your phone or computer. It can be a virus that steals your data or accounts. Do not open it unless you know the sender in person and expected exactly this file.'
+            : 'Files from other people can contain harmful content. MEIKO does not check files for viruses. Open it only if you know and trust the sender.')) +
+          '<div class="actions"><button class="btn btn-ghost" data-close>Cancel</button><button class="btn ' + (danger ? 'btn-ghost' : 'btn-primary') + '" data-save>' + icon('i-download') + (danger ? 'Save anyway' : 'Save') + '</button></div>',
+          onMount: function (body, close) { ui.$('[data-save]', body).addEventListener('click', function () { close(); a.dataset.ok = '1'; a.click(); delete a.dataset.ok; }); } });
+      }
       function tapVessel(id) {
         vesselSheet(id, { onChat: openDM, onMap: function (p) { if (fm) { fm.map.setView([p.pos.lat, p.pos.lon], Math.max(fm.map.getZoom(), 11)); $('[data-fmap]').scrollIntoView({ behavior: 'smooth', block: 'center' }); } } });
       }
