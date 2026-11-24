@@ -3,6 +3,10 @@
  *  - A group code is the shared secret. From it we derive (PBKDF2-SHA256) an AES-GCM key and a public
  *    "room tag". Relays only see the tag and ciphertext; positions and messages are readable only with the code.
  *  - Each device has its own random signing key (secp256k1 schnorr, as Nostr requires). It is not an account.
+ *  - Private chat (k:'dm'): the text is first encrypted for one vessel with a key only the two of them can
+ *    compute (secp256k1 ECDH of their device keys → HKDF-SHA256 → AES-GCM), then wrapped in the group layer.
+ *    The recipient is not written anywhere: each vessel tries the key it shares with the sender. Other group
+ *    members can see that the sender sent a private message, not to whom or what it says.
  *  - Positions/presence use an ephemeral kind (relays forward, do not store). Chat uses a regular kind with a
  *    NIP-40 expiration tag so relays that store it can hand recent messages to someone who joins later.
  * Works in browsers and in Node (tests): pass { WebSocket, crypto: MeikoNostrCrypto, subtle } to createClient.
@@ -72,6 +76,24 @@
     } catch (e) { return false; }
   }
 
+  /* -------- private (pairwise) keys -------- */
+  /** AES-GCM key shared by exactly two device keys. Same result on both sides. */
+  function pairKey(nc, subtle, sk, peerPubHex) {
+    var shared = nc.getSharedSecret(sk, nc.hexToBytes('02' + peerPubHex), true).slice(1);
+    var myPub = nc.bytesToHex(nc.schnorr.getPublicKey(sk)), pair = [myPub, peerPubHex].sort().join(':');
+    return subtle.importKey('raw', shared, 'HKDF', false, ['deriveKey']).then(function (base) {
+      return subtle.deriveKey({ name: 'HKDF', hash: 'SHA-256', salt: utf8('meiko-dm-v1'), info: utf8(pair) }, base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+    });
+  }
+  /** Safety code for two keys: 20 digits, identical on both phones. Compare by VHF/phone/in person. */
+  function safetyCode(nc, pubA, pubB) {
+    var h = nc.sha256(utf8('meiko-safety-v1:' + [pubA, pubB].sort().join(':'))), out = [];
+    for (var i = 0; i < 5; i++) { var n = ((h[i * 3] << 16) | (h[i * 3 + 1] << 8) | h[i * 3 + 2]) % 10000; out.push(('000' + n).slice(-4)); }
+    return out.join(' ');
+  }
+  /** Short ID shown next to a name so two vessels with the same name can be told apart. */
+  function shortId(pub) { return String(pub || '').slice(0, 4).toUpperCase() + '·' + String(pub || '').slice(4, 8).toUpperCase(); }
+
   /* -------- payload validation: everything received is untrusted -------- */
   function str(v, max) { return typeof v === 'string' ? v.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, max) : ''; }
   function num(v, lo, hi) { return typeof v === 'number' && isFinite(v) && v >= lo && v <= hi ? v : null; }
@@ -79,7 +101,8 @@
   function sanitize(p) {
     if (!p || typeof p !== 'object') return null;
     var k = p.k;
-    if (k !== 'live' && k !== 'chat' && k !== 'bye') return null;
+    if (k !== 'live' && k !== 'chat' && k !== 'bye' && k !== 'dm') return null;
+    if (k === 'dm') return typeof p.c === 'string' && p.c.length < 4000 ? { k: 'dm', c: p.c } : null;
     var out = { k: k, name: str(p.name, 40) || 'Unnamed vessel', callsign: str(p.callsign, 16) };
     var v = p.v && typeof p.v === 'object' ? p.v : null;
     out.vessel = v && VESSEL_TYPES.indexOf(v.type) >= 0 ? { type: v.type, h: colour(v.h), s: colour(v.s), a: colour(v.a) } : null;
@@ -101,6 +124,8 @@
     var rand = o.rand || function (n) { return nc.randomBytes(n); };
     var relays = (o.relays && o.relays.length ? o.relays : DEFAULT_RELAYS).slice(0, 8);
     var pub = nc.bytesToHex(nc.schnorr.getPublicKey(o.sk));
+    var pairs = {};
+    function pk(peer) { return pairs[peer] || (pairs[peer] = pairKey(nc, subtle, o.sk, peer)); }
     var room = null, socks = {}, seen = {}, seenN = 0, stopped = false, subId = 'meiko' + hex(rand(4));
     function status() {
       var open = 0; relays.forEach(function (u) { var s = socks[u]; if (s && s.ws && s.ws.readyState === 1) open++; });
@@ -141,6 +166,15 @@
       decrypt(subtle, room.key, ev.content).then(function (raw) {
         var p = sanitize(raw); if (!p || stopped) return;
         var base = { from: ev.pubkey, me: ev.pubkey === pub, at: Math.min(ev.created_at * 1000, now() + 60000) };
+        if (p.k === 'dm' && ev.kind === KIND_CHAT) {
+          if (base.me) return; // own private messages are kept on the device when sent
+          pk(ev.pubkey).then(function (key) { return decrypt(subtle, key, p.c); }).then(function (inner) {
+            if (!inner || stopped) return; // not for us
+            var q = sanitize({ k: 'chat', text: inner.text, name: inner.name, callsign: inner.callsign });
+            if (q && o.onDM) o.onDM(Object.assign(base, { name: q.name, callsign: q.callsign, text: q.text, id: ev.id, peer: ev.pubkey, to: pub }));
+          }, function () {});
+          return;
+        }
         if (p.k === 'chat' && ev.kind === KIND_CHAT) { if (o.onChat) o.onChat(Object.assign(base, p, { id: ev.id })); }
         else if (ev.kind === KIND_LIVE && (p.k === 'live' || p.k === 'bye')) { if (o.onLive) o.onLive(Object.assign(base, p)); }
       });
@@ -158,6 +192,7 @@
       });
     }
     function handle2(ev, payload) { // show own chat immediately
+      if (payload.k !== 'chat') return;
       var p = sanitize(payload); if (p && o.onChat) o.onChat(Object.assign({ from: pub, me: true, at: ev.created_at * 1000, id: ev.id, pending: false }, p));
     }
     return {
@@ -172,11 +207,20 @@
         emitStatus();
       },
       sendLive: function (p) { p.k = p.k || 'live'; return publish(KIND_LIVE, p, 0); },
+      sendDM: function (peer, text, me) {
+        if (!/^[0-9a-f]{64}$/.test(peer)) return Promise.reject(new Error('Unknown vessel'));
+        text = String(text).slice(0, 500);
+        return pk(peer).then(function (key) { return encrypt(subtle, key, { text: text, name: me && me.name, callsign: me && me.callsign }, rand); })
+          .then(function (c) {
+            var payload = { k: 'dm', c: c }, res;
+            return publish(KIND_CHAT, payload, CHAT_TTL_S).then(function (r) { res = r; if (o.onDM) o.onDM({ from: pub, me: true, peer: peer, to: peer, at: now(), id: r.id, text: text, name: me && me.name }); return res; });
+          });
+      },
       sendChat: function (text, me) { return publish(KIND_CHAT, Object.assign({}, me, { k: 'chat', text: String(text).slice(0, 500) }), CHAT_TTL_S); },
       status: status
     };
   }
 
   return { KIND_LIVE: KIND_LIVE, KIND_CHAT: KIND_CHAT, DEFAULT_RELAYS: DEFAULT_RELAYS, normCode: normCode, codeOk: codeOk, newCode: newCode,
-    deriveRoom: deriveRoom, encrypt: encrypt, decrypt: decrypt, signEvent: signEvent, verifyEvent: verifyEvent, sanitize: sanitize, createClient: createClient };
+    deriveRoom: deriveRoom, pairKey: pairKey, safetyCode: safetyCode, shortId: shortId, encrypt: encrypt, decrypt: decrypt, signEvent: signEvent, verifyEvent: verifyEvent, sanitize: sanitize, createClient: createClient };
 });

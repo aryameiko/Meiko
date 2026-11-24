@@ -672,7 +672,20 @@ svg.i.rot-up { transform: rotate(-90deg); } svg.i.rot-down { transform: rotate(9
 .fleet-switch input { width: 20px; height: 20px; margin-top: 2px; accent-color: var(--accent); flex: none; }
 .fleet-switch span { display: grid; gap: 2px; } .fleet-switch small { color: var(--muted); font-size: 12.5px; }
 .fleet-peers { display: grid; gap: 6px; margin-top: 6px; }
-.fleet-peer { display: flex; align-items: center; gap: 10px; text-align: left; width: 100%; padding: 9px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface, transparent); color: inherit; font: inherit; cursor: pointer; min-width: 0; }
+.fleet-peer { display: flex; align-items: center; gap: 6px; padding: 4px 8px 4px 0; border: 1px solid var(--border); border-radius: 10px; min-width: 0; }
+.fleet-peer .fp-btn { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; text-align: left; padding: 6px 4px 6px 10px; background: none; border: 0; color: inherit; font: inherit; cursor: pointer; }
+.fleet-peer .fp-dm { flex: none; }
+.fp-id { font-family: ui-monospace, monospace; font-size: 10.5px; }
+.badge-n { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--danger); color: #fff; font-size: 11px; font-weight: 700; }
+.chat-tabs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+.chat-tab { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border); background: none; color: var(--text-2); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.chat-tab .icon, .chat-tab svg { width: 14px; height: 14px; }
+.chat-tab.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.dm-head { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 12px; background: color-mix(in srgb, var(--ok) 12%, transparent); border: 1px solid color-mix(in srgb, var(--ok) 35%, transparent); font-size: 13px; }
+.dm-head > svg { width: 18px; height: 18px; flex: none; margin-top: 2px; color: var(--ok); }
+.dm-head > div { display: grid; gap: 3px; min-width: 0; } .dm-head small { color: var(--text-2); }
+.dm-head summary { cursor: pointer; font-size: 12.5px; } .dm-head .sc { font-family: ui-monospace, monospace; letter-spacing: .04em; }
+.chat-list.dm { border-color: color-mix(in srgb, var(--ok) 45%, transparent); }
 .fleet-peer.off { opacity: .65; }
 .fleet-peer .fp-main { display: grid; gap: 2px; flex: 1; min-width: 0; }
 .fleet-peer .fp-main b, .fleet-peer .fp-main small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

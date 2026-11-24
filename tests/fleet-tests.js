@@ -121,6 +121,40 @@ module.exports = function run(test) {
     }).then(function () { assert.strictEqual(b.got.chat.length, 0); b.stop(); });
   });
 
+  t('Fleet: private chat — only the recipient can read it; a third member with the group code cannot', function () {
+    var relay = new MockRelay(), dms = { a: [], b: [], x: [] };
+    var a = client(relay, 'MEIKO-PRIV-0005', { onDM: function (m) { dms.a.push(m); } });
+    var b = client(relay, 'MEIKO-PRIV-0005', { onDM: function (m) { dms.b.push(m); } });
+    var x = client(relay, 'MEIKO-PRIV-0005', { onDM: function (m) { dms.x.push(m); } });
+    return Promise.all([a.start(), b.start(), x.start()]).then(function () { return wait(20); })
+      .then(function () { return a.sendDM(b.pubkey, 'Kode dermaga: 7-B', { name: 'KM Bahari' }); })
+      .then(function () { return wait(60); }).then(function () {
+        assert.strictEqual(dms.b.length, 1); assert.strictEqual(dms.b[0].text, 'Kode dermaga: 7-B'); assert.strictEqual(dms.b[0].peer, a.pubkey); assert.strictEqual(dms.b[0].name, 'KM Bahari');
+        assert.strictEqual(dms.a.length, 1); assert.ok(dms.a[0].me); assert.strictEqual(dms.a[0].peer, b.pubkey);
+        assert.strictEqual(dms.x.length, 0, 'third member read a private message');
+        assert.strictEqual(x.got.chat.length + b.got.chat.length, 0, 'private message leaked into group chat');
+        var ev = relay.log.filter(function (m) { return m[0] === 'EVENT'; }).pop()[1];
+        assert.ok(JSON.stringify(ev).indexOf(b.pubkey) < 0, 'recipient visible in the event');
+        [a, b, x].forEach(function (c) { c.stop(); });
+      });
+  });
+  t('Fleet: safety code is the same on both sides and differs for another pair', function () {
+    var p1 = nc.bytesToHex(nc.schnorr.getPublicKey(nc.randomBytes(32))), p2 = nc.bytesToHex(nc.schnorr.getPublicKey(nc.randomBytes(32))), p3 = nc.bytesToHex(nc.schnorr.getPublicKey(nc.randomBytes(32)));
+    assert.strictEqual(fleet.safetyCode(nc, p1, p2), fleet.safetyCode(nc, p2, p1));
+    assert.ok(/^\d{4}( \d{4}){4}$/.test(fleet.safetyCode(nc, p1, p2)));
+    assert.notStrictEqual(fleet.safetyCode(nc, p1, p2), fleet.safetyCode(nc, p1, p3));
+  });
+  t('Fleet: pairwise key works for odd-y keys (both directions derive the same key)', function () {
+    var tries = [], i;
+    for (i = 0; i < 6; i++) tries.push([nc.randomBytes(32), nc.randomBytes(32)]);
+    return Promise.all(tries.map(function (k) {
+      var pa = nc.bytesToHex(nc.schnorr.getPublicKey(k[0])), pb = nc.bytesToHex(nc.schnorr.getPublicKey(k[1]));
+      return Promise.all([fleet.pairKey(nc, subtle, k[0], pb), fleet.pairKey(nc, subtle, k[1], pa)]).then(function (keys) {
+        return fleet.encrypt(subtle, keys[0], { x: 1 }, nc.randomBytes).then(function (ct) { return fleet.decrypt(subtle, keys[1], ct); }).then(function (d) { assert.deepStrictEqual(d, { x: 1 }); });
+      });
+    }));
+  });
+
   return tests.reduce(function (p, tc) {
     return p.then(function () { return test(tc[0], tc[1]); });
   }, Promise.resolve());
