@@ -126,6 +126,10 @@ Three tools under **Astronomy**, all offline:
 
 Star positions use GMST (IAU 1982) and precession (IAU 1976). Nutation, aberration and proper motion are ignored, which leaves an error of about 1′. Data come from d3-celestial (BSD-3, HYG/Hipparcos); see `js/data/LICENSE-d3-celestial`.
 
+## First-run onboarding (v1.9.6, preview)
+
+`js/onboarding.js` adds Welcome → Email → Nickname → Vessel avatar → Done. It is **not mandatory yet** (`REQUIRED = false`) while the login method is decided; preview it with `?welcome` or `#/welcome`. Registration goes through `js/auth.js` (`MEIKO.auth`): today the `local` provider only checks the email format and stores it on the device (no verification email); a provider such as Firebase Auth can be plugged in with `MEIKO.auth.use({...})` without changing the screens. The nickname is used as the name in Fleet & Chat; the email is never shared there.
+
 ## Fleet & Chat (v1.9.0)
 
 **Fleet & Chat** (Navigation menu) lets vessels that enter the same group code see each other on a map (name, vessel avatar, COG/SOG, last seen) and chat. There is no MEIKO server and no account: messages go through free public Nostr relays (`wss://relay.damus.io`, `nos.lol`, `relay.primal.net`, `offchain.pub`; editable under *How it works*).

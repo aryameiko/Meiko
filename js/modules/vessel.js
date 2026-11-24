@@ -272,5 +272,5 @@
     }
   });
 
-  MEIKO.vessel = { get: get, set: set, types: TYPES, side: side, top: top, markerHTML: markerHTML, heroHTML: heroHTML };
+  MEIKO.vessel = { get: get, set: set, types: TYPES, palette: PALETTE, side: side, top: top, markerHTML: markerHTML, heroHTML: heroHTML };
 })();

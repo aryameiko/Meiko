@@ -28,7 +28,7 @@
   }
   function me() {
     var v = MEIKO.vessel && MEIKO.vessel.get(), c = cfg();
-    return { name: (c.name || (v && v.name) || 'Unnamed vessel').slice(0, 40), callsign: v && v.callsign ? v.callsign.slice(0, 16) : '', v: v ? { type: v.type, h: v.h, s: v.s, a: v.a } : null };
+    return { name: (c.name || (MEIKO.auth && MEIKO.auth.nickname()) || (v && v.name) || 'Unnamed vessel').slice(0, 40), callsign: v && v.callsign ? v.callsign.slice(0, 16) : '', v: v ? { type: v.type, h: v.h, s: v.s, a: v.a } : null };
   }
   function supported() { return !!(window.WebSocket && window.crypto && window.crypto.subtle && window.MeikoNostrCrypto && C.fleet); }
 
