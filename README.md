@@ -126,6 +126,10 @@ Three tools under **Astronomy**, all offline:
 
 Star positions use GMST (IAU 1982) and precession (IAU 1976). Nutation, aberration and proper motion are ignored, which leaves an error of about 1′. Data come from d3-celestial (BSD-3, HYG/Hipparcos); see `js/data/LICENSE-d3-celestial`.
 
+## Course & Bearing map (v1.8.5)
+
+**Course & Bearing** has a map under the two positions. Tap the map to set A (departure) and then B (destination), or type the positions. The map shows the great circle (solid, with direction arrows), the rhumb line (dashed), the initial course at A and the final bearing at B. It works offline on the bundled outline map.
+
 ## Port distance tables (v1.8)
 
 **Port-to-Port** shows an estimated sea distance from distance tables supplied by the user: the 2026 combined update (54 ports, `.xlsx`, used first), then the older western (22 ports) and eastern (38 ports) PDF tables for pairs the update does not cover. The UI deliberately shows no table names (the app is for public use). The data are in `js/data/distance-tables.js`, transcribed exactly from the PDFs, and the lookup and routing code is in `js/core/seadist.js`. The straight-line distance and bearings are shown alongside.

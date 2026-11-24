@@ -283,7 +283,8 @@
     desc: 'True course, final bearing and reciprocal', keywords: 'heading direction azimuth reciprocal',
     lead: 'Course to steer (true, 000°–360°) from one position to another.',
     render: function (view) {
-      view.innerHTML = layout(this, ui.coordField('a', 'From') + ui.coordField('b', 'To') + actions('Calculate'),
+      view.innerHTML = layout(this, ui.coordField('a', 'From') + ui.coordField('b', 'To') +
+        '<div class="port-map-wrap"><div class="map-box port-map" data-cmap></div><small class="hint" data-cmap-hint>Tap the map to set the departure (A), then the destination (B).</small></div>' + actions('Calculate'),
         ui.empty('i-course', 'No course yet', 'Enter both positions to see the course.'),
         ui.help('Conventions', '<p>All directions are <b>true</b> bearings measured clockwise from true north, 000° to 360°. To steer by a magnetic compass apply variation and deviation from your chart and deviation card.</p>' +
           '<p><b>Great circle course</b> is the initial course; it changes along the track. <b>Rhumb line course</b> stays constant. <b>Reciprocal</b> = course ± 180°.</p>') + ui.disclaimer());
@@ -306,9 +307,55 @@
           ]), { copy: true, icon: 'i-course' });
         ui.showResult(out, html, 'MEIKO · Course\nInitial course: ' + ui.bearing(gc.initialBearing) + ' T\nFinal bearing: ' + ui.bearing(gc.finalBearing) + ' T\nRhumb line course: ' + ui.bearing(rl.bearing) + ' T\nDistance: ' + ui.num(gc.distanceNM, 2) + ' NM');
       }
-      function auto() { if (!a.isEmpty() && !b.isEmpty()) calc(true); }
-      form.addEventListener('submit', function (e) { e.preventDefault(); calc(false); });
-      ui.$('[data-reset]', form).addEventListener('click', function () { a.clear(); b.clear(); store.clear(); out.innerHTML = ui.empty('i-course', 'No course yet', 'Enter both positions.'); });
+      /* ---- map: A/B, great circle (solid), rhumb line (dashed), direction arrows; tap to set A then B ---- */
+      var cm = null, cmLayers = [];
+      function pos(f) { if (f.isEmpty()) return null; var v = f.get(); return v.ok ? v : null; }
+      function initMap() {
+        if (cm || !MEIKO.map || !window.L) return;
+        cm = MEIKO.map.create(ui.$('[data-cmap]', form), { markers: false, noRemember: true, center: [-2.5, 118], zoom: 4,
+          onMapClick: function (lat, lon) {
+            var P = pos(a), Q = pos(b);
+            if (!P || Q) { a.set(+lat.toFixed(5), +lon.toFixed(5)); b.clear(); }
+            else b.set(+lat.toFixed(5), +lon.toFixed(5));
+            auto(); updateMap(true); return false;
+          } });
+        if (!cm) return;
+        updateMap(true);
+      }
+      function arrow(L, ll, deg) {
+        return L.marker(ll, { icon: L.divIcon({ className: 'cm-arrow', html: '<svg viewBox="0 0 20 20" style="transform:rotate(' + deg.toFixed(1) + 'deg)"><path d="M10 2 L17 17 L10 13 L3 17 Z"/></svg>', iconSize: [20, 20], iconAnchor: [10, 10] }), interactive: false, keyboard: false, zIndexOffset: 500 });
+      }
+      function screenDeg(p1, p2) { var m = cm.map, x = m.latLngToLayerPoint(p1), y = m.latLngToLayerPoint(p2); return Math.atan2(y.x - x.x, -(y.y - x.y)) * 180 / Math.PI; }
+      function updateMap(fit) {
+        if (!cm) return;
+        var L = cm.L, P = pos(a), Q = pos(b), pts = [];
+        cmLayers.forEach(function (l) { cm.map.removeLayer(l); }); cmLayers = [];
+        var gc = P && Q ? C.geo.greatCircle(P.lat, P.lon, Q.lat, Q.lon) : null;
+        if (gc && !gc.coincident) {
+          var line = MEIKO.map.gcPoints({ lat: P.lat, lon: P.lon }, { lat: Q.lat, lon: Q.lon });
+          cmLayers.push(L.polyline([[P.lat, P.lon], [Q.lat, Q.lon]], { className: 'cm-rhumb', interactive: false }).addTo(cm.map));
+          cmLayers.push(L.polyline(line, { className: 'cm-gc', interactive: false }).addTo(cm.map));
+          var n = line.length, i1 = Math.max(1, Math.round(n * 0.3)), i2 = Math.min(n - 2, Math.round(n * 0.7));
+          if (n > 3) [i1, i2].forEach(function (i) { cmLayers.push(arrow(L, line[i], screenDeg(line[i - 1], line[i + 1])).addTo(cm.map)); });
+        }
+        function dir(k) { if (!P || !Q) return 'right'; var north = Q.lat >= P.lat; return (k === 'B') === north ? 'top' : 'bottom'; }
+        [[P, 'A', 'pm-a', gc && !gc.coincident ? ' · ' + ui.bearing(gc.initialBearing) + ' T' : ''], [Q, 'B', 'pm-b', gc && !gc.coincident ? ' · final ' + ui.bearing(gc.finalBearing) + ' T' : '']].forEach(function (x) {
+          if (!x[0]) return;
+          var ll = [x[0].lat, x[0].lon]; pts.push(ll);
+          cmLayers.push(L.marker(ll, { icon: L.divIcon({ className: 'mk pm-end ' + x[2], html: x[1], iconSize: [28, 28], iconAnchor: [14, 14] }), zIndexOffset: 1000, keyboard: false, interactive: false })
+            .bindTooltip(x[1] + x[3], { permanent: true, direction: dir(x[1]), offset: { top: [0, -14], bottom: [0, 14], right: [12, 0] }[dir(x[1])], className: 'pm-label' }).addTo(cm.map));
+        });
+        var hint = ui.$('[data-cmap-hint]', form);
+        if (hint) hint.textContent = !P ? 'Tap the map to set the departure (A), then the destination (B).' : !Q ? 'Now tap the destination (B).' : 'Solid line: great circle (shortest). Dashed: rhumb line (constant course). Arrows show the direction. Tap again to start over.';
+        if (fit) cm.map.invalidateSize();
+        if (fit && pts.length === 2 && !(gc && gc.coincident)) cm.map.fitBounds(L.latLngBounds(pts).extend(L.latLngBounds(gc ? MEIKO.map.gcPoints({ lat: P.lat, lon: P.lon }, { lat: Q.lat, lon: Q.lon }) : pts)), { padding: [40, 40], maxZoom: 10 });
+        else if (fit && pts.length === 1 && !cm.map.getBounds().contains(pts[0])) cm.map.panTo(pts[0]);
+      }
+      var mapT = null;
+      function auto() { if (!a.isEmpty() && !b.isEmpty()) calc(true); clearTimeout(mapT); mapT = setTimeout(function () { updateMap(true); }, 400); }
+      form.addEventListener('submit', function (e) { e.preventDefault(); calc(false); updateMap(true); });
+      ui.$('[data-reset]', form).addEventListener('click', function () { a.clear(); b.clear(); store.clear(); updateMap(false); out.innerHTML = ui.empty('i-course', 'No course yet', 'Enter both positions.'); });
+      setTimeout(initMap, 0);
       auto();
     }
   });

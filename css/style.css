@@ -655,3 +655,7 @@ svg.i.rot-up { transform: rotate(-90deg); } svg.i.rot-down { transform: rotate(9
 .pm-line { stroke: #D4A017; stroke-width: 3; stroke-dasharray: 8 7; fill: none; }
 .leaflet-tooltip.pm-label { font-weight: 700; font-size: 12px; padding: 2px 6px; }
 @media (max-width: 480px) { .port-map { height: 260px; } }
+.cm-gc { stroke: #D4A017; stroke-width: 3.5; fill: none; }
+.cm-rhumb { stroke: #1B3A63; stroke-width: 2; stroke-dasharray: 6 6; fill: none; opacity: .8; }
+.cm-arrow svg { width: 20px; height: 20px; display: block; filter: drop-shadow(0 1px 2px rgba(0,0,0,.5)); }
+.cm-arrow path { fill: #D4A017; stroke: #fff; stroke-width: 1.5; stroke-linejoin: round; }
