@@ -71,6 +71,10 @@
         });
       },
       redirected: function () { return redirected; },
+      /** ID token of the signed-in Firebase user (proves to Firestore that this is a MEIKO account), or null. */
+      idToken: function () {
+        return Promise.resolve(fbAuth.authStateReady ? fbAuth.authStateReady() : null).then(function () { var u = fbAuth.currentUser; return u ? u.getIdToken() : null; });
+      },
       reset: function (email) { return F.sendPasswordResetEmail(fbAuth, email).catch(function (e) { throw fbErr(e); }); },
       signOut: function () { return F.signOut(fbAuth).catch(function () {}); },
       /** Delete the Firebase account. Firebase wants a recent sign-in, so confirm with the password or Google first. */
@@ -126,7 +130,35 @@
     /** Resolves the profile when the page was opened by a finished Google redirect sign-in, else null. */
     googleRedirect: function () { var pv = providers[active]; return pv.redirected ? pv.redirected().then(function (r) { return r ? switchTo(r) : null; }) : Promise.resolve(null); },
     resetPassword: function (email) { return providers[active].reset(String(email || '').trim().toLowerCase()); },
-    signOut: function () { var pv = providers[active]; MEIKO.storage.remove(KEY); return pv.signOut ? pv.signOut() : Promise.resolve(); },
+    signOut: function () { var pv = providers[active]; MEIKO.storage.remove(KEY); MEIKO.storage.remove('fleetKey'); return pv.signOut ? pv.signOut() : Promise.resolve(); },
+    /**
+     * Key of the public fleet. It is not in MEIKO's code (anyone can download that); it is kept in Firestore
+     * (config/fleet, field "key") where the security rules let only signed-in MEIKO accounts read it, so people
+     * without a MEIKO account cannot read the positions in the public fleet. Kept on this device for offline
+     * restarts and refreshed every 6 hours (force = refresh now). Resolves the key or rejects.
+     */
+    fleetKey: function (force) {
+      var p = profile(), c = MEIKO.storage.get('fleetKey', null), cfg = MEIKO.FIREBASE_CONFIG, pv = providers[active];
+      var mine = c && p && c.uid === p.uid && typeof c.k === 'string' ? c.k : null;
+      if (mine && !force && Date.now() - (c.at || 0) < 6 * 3600 * 1000) return Promise.resolve(mine);
+      if (!pv.idToken || !cfg || !cfg.projectId) return mine ? Promise.resolve(mine) : Promise.reject(new Error('The public fleet needs a MEIKO account.'));
+      return pv.idToken().then(function (tok) {
+        if (!tok) throw new Error('Sign in again (internet needed) to join the public fleet.');
+        return fetch('https://firestore.googleapis.com/v1/projects/' + encodeURIComponent(cfg.projectId) + '/databases/(default)/documents/config/fleet', { headers: { Authorization: 'Bearer ' + tok }, cache: 'no-store', credentials: 'omit' });
+      }).then(function (r) {
+        if (r.status === 403 || r.status === 404) throw new Error('The public fleet is not set up yet. Please tell the app owner.');
+        if (!r.ok) throw new Error('Could not load the public fleet (HTTP ' + r.status + ').');
+        return r.json();
+      }).then(function (d) {
+        var k = d && d.fields && d.fields.key && d.fields.key.stringValue;
+        if (typeof k !== 'string' || k.length < 16) throw new Error('The public fleet is not set up yet. Please tell the app owner.');
+        MEIKO.storage.set('fleetKey', { k: k, uid: p && p.uid, at: Date.now() });
+        return k;
+      }).catch(function (e) {
+        if (mine) return mine; // offline or a hiccup: keep using the last key
+        throw e && e.message && !/Failed to fetch|NetworkError|Load failed/i.test(e.message) ? e : new Error('No internet connection: the public fleet needs internet the first time.');
+      });
+    },
     /** Record agreement to the Privacy Policy and Terms ({ v, at, age18 }). */
     setConsent: function (c) { return save({ consent: c }); },
     /** True when deleting needs the password (email + password accounts on Firebase). */
@@ -134,7 +166,7 @@
     /** Delete the account on the server (Firebase), then remove the profile from this device. */
     deleteAccount: function (pw) {
       var pv = providers[active];
-      return Promise.resolve(pv.deleteAccount ? pv.deleteAccount(pw) : null).then(function () { MEIKO.storage.remove(KEY); return pv.signOut ? pv.signOut() : null; });
+      return Promise.resolve(pv.deleteAccount ? pv.deleteAccount(pw) : null).then(function () { MEIKO.storage.remove(KEY); MEIKO.storage.remove('fleetKey'); return pv.signOut ? pv.signOut() : null; });
     },
     /** Plug in another provider (e.g. Firebase) later: { id, label, verifies, register(email) → Promise<{email, verified, uid}> }. */
     use: function (p) { providers[p.id] = p; active = p.id; },

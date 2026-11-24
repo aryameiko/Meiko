@@ -11,14 +11,26 @@
 (function () {
   'use strict';
   var ui = MEIKO.ui, icon = ui.icon, esc = ui.esc, C = window.MeikoCore;
-  var PUB = C.fleet.PUBLIC_CODE, KEY = 'fleet', ONLINE_MS = 3 * 60 * 1000, BEAT_MS = 30000, MIN_GAP_MS = 10000;
+  /* The public fleet's code comes from MEIKO.auth.fleetKey() (Firestore, signed-in accounts only), not from the code. */
+  var PUB = null, pubTry = 0, pubCheck = 0, pubErr = '', KEY = 'fleet', ONLINE_MS = 3 * 60 * 1000, BEAT_MS = 30000, MIN_GAP_MS = 10000;
 
   /* ======================= session (lives while the app is open) ======================= */
   var st = { dm: {}, dmName: {}, unread: {}, view: 'group', client: null, tag: null, peers: {}, chat: [], status: { relays: 0, connected: 0 }, fix: null, prevFix: null, lastSent: 0, timer: null, joining: false, code: null };
   var subs = [];
   function cfg() { return Object.assign({ code: '', joined: false, share: false, shareAsked: false, publicOff: false, general: false, blocked: [], name: '', relays: '' }, MEIKO.storage.get(KEY, {})); }
   /** In the public fleet (everyone), not a private group. */
-  function isPublic() { return st.code === PUB; }
+  function isPublic() { return !!PUB && st.code === PUB; }
+  function loadPub(force) {
+    if (!MEIKO.auth || !MEIKO.auth.fleetKey) return Promise.reject(new Error('The public fleet needs a MEIKO account.'));
+    return MEIKO.auth.fleetKey(force).then(function (k) {
+      var c = C.fleet.normCode(k); if (!C.fleet.codeOk(c)) throw new Error('The public fleet key is not valid. Please tell the app owner.');
+      PUB = c; pubErr = ''; pubCheck = Date.now(); return c;
+    });
+  }
+  function joinPublic() {
+    pubTry = Date.now();
+    return loadPub().then(join, function (e) { pubErr = e.message; emit('all'); throw e; });
+  }
   /** Vessels this user blocked: their messages are dropped and they are hidden from the map and list. */
   function blocked(id) { var b = cfg().blocked; return Array.isArray(b) && b.indexOf(id) >= 0; }
   function setBlocked(id, on) {
@@ -356,8 +368,13 @@
       if (st.joining || navigator.onLine === false) return;
       var c = cfg();
       if (c.joined && c.code) join(c.code).catch(function () {});
-      else if (!c.publicOff) join(PUB).catch(function () {});
+      else if (!c.publicOff && Date.now() - pubTry > 60000) joinPublic().catch(function () {});
       return;
+    }
+    /* The owner can change the public key (e.g. if it leaked): check every 6 hours and move to the new one. */
+    if (isPublic() && Date.now() - pubCheck > 6 * 3600 * 1000 && navigator.onLine !== false) {
+      var old = st.code; pubCheck = Date.now();
+      loadPub(true).then(function (code) { if (code !== old && st.code === old) { leave(true); join(code).catch(function () {}); } }, function () {});
     }
     if (!cfg().shareAsked) shareNotice();
   }
@@ -501,7 +518,7 @@
     render: function (view) {
       var c = cfg();
       var setup = '<div class="card card-pad form-gap" data-setup>' +
-        '<div data-pubjoin-box><p class="small">You are not in the public fleet. Join it to see all MEIKO vessels that are online.</p><div class="actions"><button type="button" class="btn btn-primary" data-pubjoin>' + icon('i-check') + 'Join the public fleet</button></div></div>' +
+        '<div data-pubjoin-box><p class="small">You are not in the public fleet. Join it to see all MEIKO vessels that are online.</p><p class="small" data-puberr hidden></p><div class="actions"><button type="button" class="btn btn-primary" data-pubjoin>' + icon('i-check') + 'Join the public fleet</button></div></div>' +
         '<div class="card-title" data-setup-title>' + icon('i-lock') + 'Private group (optional)</div>' +
         '<p class="small muted">Only vessels that enter the same code see each other there; you leave the public fleet while you are in a group.</p>' +
         '<label class="field"><span>Your name on the map</span><input data-name maxlength="40" placeholder="' + esc(me().name) + '" value="' + esc(c.name || '') + '"></label>' +
@@ -525,7 +542,7 @@
       view.innerHTML = ui.pageHead(this) + '<div data-fleet-page class="fleet-page">' + live + setup +
         ui.notice('warn', '<b>Not a safety system.</b> Fleet & Chat needs internet on both sides and uses free public relays that can be slow or down. For distress and collision avoidance use VHF (Ch 16 / DSC) and AIS.') +
         ui.help('How it works and privacy', '<p><b>Public fleet.</b> Everyone signed in to MEIKO joins it automatically, so vessels that are online see each other without a code. Anyone using MEIKO can see the nickname, vessel and (only if you share it) position of the vessels in it. Your position is shared by default; switch <b>Share my position</b> off to hide it. <b>General Group</b> is one chat room for everyone, no code: join it under Chat. It is not private and not moderated; tap a name to <b>Block</b> or <b>Report</b> a vessel.</p>' +
-          '<p>MEIKO has no server of its own. Messages travel through free public <b>Nostr relays</b>, encrypted, so the relays see only scrambled data. In a <b>private group</b> the key is made from the group code: anyone who knows the code can read the group, so share it only with people you trust. The public fleet\'s key is public by design.</p>' +
+          '<p>MEIKO has no server of its own. Messages travel through free public <b>Nostr relays</b>, encrypted, so the relays see only scrambled data. In a <b>private group</b> the key is made from the group code: anyone who knows the code can read the group, so share it only with people you trust. The public fleet\'s key is given only to signed-in MEIKO accounts (it is not in the app\'s code), so people without a MEIKO account cannot read positions or General Group. Anyone who creates a MEIKO account can.</p>' +
           '<p>Your position is sent only while <b>Share my position</b> is on, every 30 seconds, and only while MEIKO is open. Phones pause web apps in the background, so others may see you as offline. <b>Private chat</b>: tap a vessel on the map or in the list, then <b>Chat</b>. No extra code is needed. It is encrypted a second time with a key only your device and theirs can compute, so nobody else, including other vessels in the fleet, can read it. For very sensitive information you can optionally compare the number under <i>Verify</i> by VHF or phone. Relays and group members can still see <i>that</i> you sent a private message and when, but not to whom or what it says. Anyone who gets hold of an unlocked phone can read its messages.</p><p>Positions are not stored by the relays; recent chat (up to 2 days) is, so people who join later can read it. The last 100 messages are also kept on this device.</p><p><b>Photos and files</b> (the paperclip) are encrypted like messages (private ones end-to-end) and sent in small parts of 16 KB, because public relays refuse large messages. Photos are compressed to about 300 KB; other files can be up to 512 KB. A 300 KB photo takes about 20 parts and roughly 6–10 seconds; keep MEIKO open until it says sent. Some relays limit how fast you may send, so a large file can arrive incomplete. Received files are kept in this browser\'s storage for 3 days.</p>' +
           '<p>Vessels show as online if they sent something in the last 3 minutes; otherwise you see when they were last seen.</p>' +
           '<p><button type="button" class="btn btn-ghost btn-sm" data-unblock>Unblock all vessels</button></p>' +
@@ -543,6 +560,7 @@
         var pub = isPublic();
         $('[data-setup]').hidden = joined && !pub; $('[data-live]').hidden = !joined;
         $('[data-pubjoin-box]').hidden = joined || st.joining;
+        var pe = $('[data-puberr]'); pe.hidden = !pubErr || joined; pe.textContent = pubErr;
         $('[data-offline-note]').innerHTML = navigator.onLine === false ? ui.notice('warn', 'You are offline. Fleet & Chat needs an internet connection.', 'i-wifi-off') : '';
         if (joined) {
           $('[data-codelabel]').textContent = pub ? 'Fleet' : 'Private group';
@@ -672,7 +690,7 @@
         if (e.target.closest('[data-genleave]')) { setGeneral(false); return; }
         var w = e.target.closest('[data-who]'); if (w) tapVessel(w.dataset.who);
       });
-      $('[data-pubjoin]').addEventListener('click', function () { saveCfg({ publicOff: false, joined: false }); join(PUB).catch(function (er) { ui.toast(er.message); }); });
+      $('[data-pubjoin]').addEventListener('click', function () { saveCfg({ publicOff: false, joined: false }); joinPublic().catch(function (er) { ui.toast(er.message); }); });
       $('[data-new]').addEventListener('click', function () { $('[data-code]').value = C.fleet.newCode(window.MeikoNostrCrypto.randomBytes); });
       $('[data-name]').addEventListener('input', function (e) { saveCfg({ name: e.target.value.trim() }); });
       $('[data-relays]').addEventListener('change', function (e) { saveCfg({ relays: e.target.value.trim() }); if (st.client) join(cfg().code).catch(function (er) { ui.toast(er.message); }); });

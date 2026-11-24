@@ -41,6 +41,8 @@
    * each other without exchanging a code. Its key is public (anyone with MEIKO's source can derive it), so the
    * relays see only ciphertext but the content is NOT secret. Private chat inside it stays end-to-end encrypted.
    */
+  /* Old public-fleet code (v1.13.0–v1.13.2 test builds). Since v1.13.2 the app gets the real public key from
+   * Firestore after sign-in (MEIKO.auth.fleetKey), so it is not in this file; this value is kept for the tests only. */
   var PUBLIC_CODE = 'MEIKO-PUBLIC-FLEET-V1';
 
   function normCode(code) { return String(code || '').trim().toUpperCase().replace(/\s+/g, ''); }
