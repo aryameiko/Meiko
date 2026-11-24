@@ -1,18 +1,19 @@
 /*
- * MEIKO — first-run onboarding: Welcome → Account → (Verify email) → Nickname → Vessel avatar → Done.
- * With Firebase configured (js/firebase-config.js) the account step uses email + password, a verification
- * email must be confirmed, and onboarding is REQUIRED before the app can be used. Without a config it is a
- * device-only preview (?welcome or #/welcome).
- * Offline: once an account is verified and the profile is complete, the gate only reads the profile saved on
- * this device, so MEIKO opens without internet.
+ * MEIKO — first-run onboarding: Welcome → Account → Nickname → Vessel avatar → Done.
+ * With Firebase configured (js/firebase-config.js) the account step offers a Google account or email +
+ * password (no email confirmation), and onboarding is REQUIRED before the app can be used. Without a config
+ * it is a device-only preview (?welcome or #/welcome).
+ * Offline: once the profile is complete, the gate only reads the profile saved on this device, so MEIKO
+ * opens without internet.
  */
 (function () {
   'use strict';
   var ui = MEIKO.ui, esc = ui.esc, icon = ui.icon;
   var FB = MEIKO.auth.usesFirebase();
+  var GOOGLE_G = '<svg class="g-logo" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>';
   var REQUIRED = FB;
-  var el = null, step = 0, draft = {}, mode = 'new', resendAt = 0;
-  var STEPS = FB ? ['welcome', 'account', 'verify', 'nick', 'avatar', 'done'] : ['welcome', 'account', 'nick', 'avatar', 'done'];
+  var el = null, step = 0, draft = {}, mode = 'new';
+  var STEPS = ['welcome', 'account', 'nick', 'avatar', 'done'];
   var FIRST = 1, LAST = STEPS.length - 2; // steps with dots / back button
 
   function wants() {
@@ -22,7 +23,6 @@
   function resumeStep() {
     var p = MEIKO.auth.profile();
     if (!p || !p.email) return 0;
-    if (FB && !p.verified) return STEPS.indexOf('verify');
     if (!p.nickname) return STEPS.indexOf('nick');
     if (!MEIKO.vessel.get()) return STEPS.indexOf('avatar');
     return 0;
@@ -36,6 +36,7 @@
     el = document.createElement('div'); el.className = 'onb'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true'); el.setAttribute('aria-label', 'Welcome to MEIKO');
     document.body.appendChild(el); document.body.classList.add('onb-open');
     paint();
+    if (FB) MEIKO.auth.googleRedirect().then(function (p) { if (p && el) signedIn(p); });
   }
   function close() {
     if (!el) return;
@@ -64,7 +65,9 @@
     } else if (s === 'account') {
       if (FB) {
         var isNew = mode === 'new';
-        h = head(isNew ? 'Create your account' : 'Sign in', isNew ? 'We will send a link to your email to confirm it is yours.' : 'Use the email and password you registered with.') +
+        h = head(isNew ? 'Create your account' : 'Sign in', isNew ? 'Use your Google account, or an email and a password.' : 'Use your Google account, or the email and password you registered with.') +
+          '<button type="button" class="btn btn-ghost onb-google" data-google>' + GOOGLE_G + (isNew ? 'Continue with Google' : 'Sign in with Google') + '</button>' +
+          '<div class="onb-or"><span>or with email</span></div>' +
           '<div class="onb-seg" role="tablist"><button type="button" role="tab" class="' + (isNew ? 'on' : '') + '" data-mode="new">Create account</button><button type="button" role="tab" class="' + (isNew ? '' : 'on') + '" data-mode="old">I have an account</button></div>' +
           '<label class="field"><span>Email</span><input type="email" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" data-email placeholder="name@example.com" value="' + esc(draft.email) + '"></label>' +
           '<label class="field"><span>Password</span><input type="password" data-pw autocomplete="' + (isNew ? 'new-password' : 'current-password') + '" minlength="8" placeholder="' + (isNew ? 'At least 8 characters' : 'Your password') + '"></label>' +
@@ -78,20 +81,6 @@
           '<p class="small muted">' + icon('i-info') + ' Preview: the email is kept on this device only; no verification email is sent.</p>' +
           '<button class="btn btn-primary onb-next" data-next>Continue</button>';
       }
-    } else if (s === 'verify' && MEIKO.auth.verifyMethod() !== 'link') {
-      var sent = MEIKO.auth.verifyMethod() === 'code';
-      h = head('Enter the code', sent ? 'We sent a 6-digit code to <b>' + esc(draft.email) + '</b>. Open the email (check Spam too) and type the code here. It is valid for 10 minutes.' : 'Sending a 6-digit code to <b>' + esc(draft.email) + '</b>…') +
-        '<label class="field"><span>Confirmation code</span><input class="onb-otp" data-otp inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code" maxlength="7" placeholder="••••••"' + (sent ? '' : ' disabled') + '><small class="hint" data-err></small></label>' + offlineNote() +
-        '<button class="btn btn-primary onb-next" data-next' + (sent ? '' : ' disabled') + '>Confirm</button>' +
-        '<button type="button" class="btn btn-ghost onb-alt" data-resend>Send a new code</button>' +
-        '<button type="button" class="btn btn-ghost onb-alt" data-other>Use a different email</button>';
-    } else if (s === 'verify') {
-      h = head('Check your email', 'We sent a confirmation link to <b>' + esc(draft.email) + '</b>. Open the email (check Spam too), tap the link, then come back here.') +
-        '<div class="onb-mail">' + icon('i-check') + '</div>' +
-        '<small class="hint" data-err></small>' + offlineNote() +
-        '<button class="btn btn-primary onb-next" data-next>I have confirmed my email</button>' +
-        '<button type="button" class="btn btn-ghost onb-alt" data-resend>Send the link again</button>' +
-        '<button type="button" class="btn btn-ghost onb-alt" data-other>Use a different email</button>';
     } else if (s === 'nick') {
       h = head('Your nickname', 'This is how other vessels see you on the map and in chat.') +
         '<label class="field"><span>Nickname</span><input data-nick maxlength="24" autocomplete="nickname" placeholder="e.g. Kapten Arya" value="' + esc(draft.nick) + '"><small class="hint" data-err></small></label>' +
@@ -104,7 +93,7 @@
         '<button class="btn btn-primary onb-next" data-next>Finish</button>';
     } else {
       h = '<div class="onb-done">' + art() + '<h1>All set, ' + esc(draft.nick) + '!</h1><p class="onb-sub">' + esc(draft.vname || draft.nick) + ' is ready. You can change your vessel any time under Settings → My Vessel, and your account under Settings → Account.</p>' +
-        '<div class="kv onb-kv"><div class="k">Email</div><div class="v">' + esc(draft.email) + (FB ? ' <small>✓ confirmed</small>' : '') + '</div><div class="k">Nickname</div><div class="v">' + esc(draft.nick) + '</div></div></div>' +
+        '<div class="kv onb-kv"><div class="k">Email</div><div class="v">' + esc(draft.email) + (FB && MEIKO.auth.profile() && MEIKO.auth.profile().via === 'google' ? ' <small>· Google</small>' : '') + '</div><div class="k">Nickname</div><div class="v">' + esc(draft.nick) + '</div></div></div>' +
         '<button class="btn btn-primary onb-next" data-next>Open MEIKO</button>';
     }
     el.innerHTML = '<div class="onb-card onb-step-' + s + '">' + h + '</div>';
@@ -116,6 +105,14 @@
     if (!ok) { var i = el.querySelector('input'); if (i) { i.classList.add('invalid'); i.focus(); } }
   }
   function busy(on) { el.querySelectorAll('button').forEach(function (b) { b.disabled = on; }); }
+  /** After any sign-in: keep the email, prefill the nickname, and skip the steps already done. */
+  function signedIn(p) {
+    draft.email = p.email || draft.email;
+    if (p.nickname) draft.nick = p.nickname; else if (!draft.nick && p.suggestedNick) draft.nick = p.suggestedNick;
+    if (p.nickname && MEIKO.vessel.get()) { step = STEPS.indexOf('done'); var v = MEIKO.vessel.get(); draft.vname = v.name || ''; draft.type = v.type; draft.h = v.h; draft.s = v.s; draft.a = v.a; }
+    else step = STEPS.indexOf('nick');
+    paint();
+  }
   function next() {
     var s = STEPS[step];
     if (s === 'account') {
@@ -128,28 +125,11 @@
         if (pw.length < 8) return err('Password: at least 8 characters.');
         if (pw !== el.querySelector('[data-pw2]').value) return err('The two passwords are not the same.');
         busy(true);
-        return MEIKO.auth.signUp(em, pw).then(function () { step = STEPS.indexOf('verify'); resendAt = Date.now() + 60000; paint(); }, function (e) { busy(false); err(e.message); });
+        return MEIKO.auth.signUp(em, pw).then(signedIn, function (e) { busy(false); err(e.message); });
       }
       if (!pw) return err('Enter your password.');
       busy(true);
-      return MEIKO.auth.signIn(em, pw).then(function (p) {
-        if (p.nickname) draft.nick = p.nickname;
-        step = p.verified ? STEPS.indexOf('nick') : STEPS.indexOf('verify'); paint();
-      }, function (e) { busy(false); err(e.message); });
-    }
-    if (s === 'verify' && MEIKO.auth.verifyMethod() !== 'link') {
-      var oi = el.querySelector('[data-otp]'), code = oi ? oi.value.replace(/\D/g, '') : '';
-      if (code.length !== 6) return err('Enter the 6-digit code from the email.');
-      busy(true);
-      return MEIKO.auth.verifyCode(code).then(function (p) {
-        if (p.verified) { step++; paint(); } else { busy(false); err('Not confirmed yet. Try again.'); }
-      }, function (e) { busy(false); if (e.signIn) { mode = 'old'; step = STEPS.indexOf('account'); paint(); err(e.message, true); } else { err(e.message); if (oi) oi.select(); } });
-    }
-    if (s === 'verify') {
-      busy(true);
-      return MEIKO.auth.refreshVerification().then(function (p) {
-        if (p.verified) { step++; paint(); } else { busy(false); err('Not confirmed yet. Open the link in the email first, then tap this button again.'); }
-      }, function (e) { busy(false); if (e.signIn) { mode = 'old'; step = STEPS.indexOf('account'); paint(); err(e.message, true); } else err(e.message); });
+      return MEIKO.auth.signIn(em, pw).then(signedIn, function (e) { busy(false); err(e.message); });
     }
     if (s === 'nick') {
       var n = el.querySelector('[data-nick]').value.trim().replace(/\s+/g, ' ');
@@ -167,7 +147,7 @@
   function back() {
     keep();
     var s = STEPS[step];
-    if (s === 'verify' || (s === 'nick' && FB)) { step = STEPS.indexOf('account'); paint(); return; }
+    if (s === 'nick' && FB) { step = STEPS.indexOf('account'); paint(); return; }
     step--; paint();
   }
   function bind() {
@@ -181,19 +161,9 @@
       if (!MEIKO.auth.validEmail(em)) return err('Type your email above first, then tap "Forgot password?".');
       busy(true); MEIKO.auth.resetPassword(em).then(function () { busy(false); err('A password reset link was sent to ' + em + '.', true); }, function (e) { busy(false); err(e.message); });
     });
-    var rs = el.querySelector('[data-resend]'); if (rs) rs.addEventListener('click', function () {
-      if (Date.now() < resendAt) return err('Please wait ' + Math.ceil((resendAt - Date.now()) / 1000) + ' s before sending again.');
-      sendConfirm(true);
+    var gg = el.querySelector('[data-google]'); if (gg) gg.addEventListener('click', function () {
+      busy(true); MEIKO.auth.signInGoogle().then(signedIn, function (e) { busy(false); if (!e.cancelled) err(e.message); });
     });
-    function sendConfirm(again) {
-      busy(true); MEIKO.auth.resendVerification().then(function (m) {
-        resendAt = Date.now() + 60000;
-        if (m === 'done') return MEIKO.auth.refreshVerification().then(function () { step = STEPS.indexOf('nick'); paint(); });
-        paint(); err((m === 'link' ? 'Confirmation link sent' : 'Code sent') + (again ? ' again' : '') + ' to ' + draft.email + '.', true);
-      }, function (e) { busy(false); if (e.signIn) { mode = 'old'; step = STEPS.indexOf('account'); paint(); err(e.message, true); } else if (!again && MEIKO.auth.verifyMethod() === 'code') { paint(); err('A code was sent to ' + draft.email + ' a moment ago. Check your email (and Spam).', true); } else err(e.message); });
-    }
-    var otp = el.querySelector('[data-otp]'); if (otp) otp.addEventListener('input', function () { var v = otp.value.replace(/\D/g, '').slice(0, 6); if (otp.value !== v) otp.value = v; if (v.length === 6) next(); });
-    if (STEPS[step] === 'verify' && !MEIKO.auth.verifyMethod() && !draft.autoSent) { draft.autoSent = true; sendConfirm(false); }
     var ot = el.querySelector('[data-other]'); if (ot) ot.addEventListener('click', function () { MEIKO.auth.signOut(); draft.email = ''; mode = 'new'; step = STEPS.indexOf('account'); paint(); });
     el.querySelectorAll('[data-type]').forEach(function (x) { x.addEventListener('click', function () { keep(); var t = MEIKO.vessel.types.filter(function (y) { return y.id === x.dataset.type; })[0]; draft.type = t.id; draft.h = t.def.h; draft.s = t.def.s; draft.a = t.def.a; paint(); }); });
     el.querySelectorAll('[data-hull]').forEach(function (x) { x.addEventListener('click', function () { keep(); draft.h = x.dataset.hull; paint(); }); });

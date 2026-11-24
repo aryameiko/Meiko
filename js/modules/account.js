@@ -16,7 +16,7 @@
         return;
       }
       view.innerHTML = ui.pageHead(this) + '<div class="card card-pad form-gap">' +
-        ui.kv([['Email', esc(p.email)], ['Status', fb ? (p.verified ? '<span class="badge ok">confirmed</span>' : '<span class="badge warn">not confirmed</span>') : 'Saved on this device only'], ['Signed in with', fb ? 'Email &amp; password (Firebase)' : 'This device']]) +
+        ui.kv([['Email', esc(p.email)], ['Signed in with', fb ? (p.via === 'google' ? 'Google account' : 'Email &amp; password') : 'This device (saved here only)']]) +
         '<label class="field"><span>Nickname</span><input data-nick maxlength="24" value="' + esc(p.nickname || '') + '"><small class="hint" data-hint>Shown to other vessels in Fleet &amp; Chat.</small></label>' +
         '<div class="actions"><button class="btn btn-primary" data-save>' + icon('i-check') + 'Save nickname</button><a class="btn btn-ghost" href="#/t/vessel">' + icon('i-anchor') + 'My Vessel</a></div></div>' +
         '<div class="card card-pad form-gap"><b>Sign out</b><p class="small muted">' + (MEIKO.onboarding && MEIKO.onboarding.required() ? 'After signing out you must sign in again (internet needed) before using MEIKO. Your saved places, tracks and vessel stay on this device.' : 'Removes your registration from this device.') + '</p>' +
