@@ -373,6 +373,19 @@
     });
   }
 
+  /** Since v1.12: remove street-map (OpenStreetMap) tiles saved by older versions; its tile policy forbids offline downloads. */
+  function purgeSavedOsm() {
+    if (MEIKO.storage.get('map:osmPurged', false)) return Promise.resolve(0);
+    var list = areas(), changed = 0;
+    list = list.map(function (a) { if (a.layers.indexOf('osm') === -1) return a; changed++; var l = a.layers.filter(function (x) { return x !== 'osm'; }); return Object.assign({}, a, { layers: l }); })
+      .filter(function (a) { return a.layers.length; });
+    MEIKO.storage.set(AREAS_KEY, list);
+    var done = function () { MEIKO.storage.set('map:osmPurged', true); return changed; };
+    if (!('caches' in window)) return Promise.resolve(done());
+    return caches.open(SAVED_CACHE).then(function (c) {
+      return c.keys().then(function (keys) { return Promise.all(keys.filter(function (k) { return k.url.indexOf('tile.openstreetmap.org') !== -1; }).map(function (k) { return c.delete(k); })); });
+    }).then(done, done);
+  }
   function offlineCard(view, ctl) {
     var box = ui.$('[data-offline-card]', view), rects = null, job = null;
     function drawRects() {
@@ -383,8 +396,10 @@
     function plan() {
       var bb = ctl.map.getBounds(), z = ctl.map.getZoom();
       var b = { s: bb.getSouth(), w: bb.getWest(), n: bb.getNorth(), e: bb.getEast() };
-      var base = ctl.base() === 'outline' ? 'osm' : ctl.base();
-      var layers = [base]; if (base === 'sat' && getView().places) layers.push('places'); if (ctl.sea()) layers.push('sea');
+      // The OpenStreetMap tile policy forbids prefetching / "download for offline" on tile.openstreetmap.org,
+      // so the street map is never bulk-saved (viewed tiles are still cached as you browse). Satellite can be saved.
+      var base = ctl.base() === 'sat' ? 'sat' : null;
+      var layers = base ? [base] : []; if (base === 'sat' && getView().places) layers.push('places'); if (ctl.sea()) layers.push('sea');
       var z0 = Math.max(1, Math.min(z, MAX_Z)), z1 = Math.min(MAX_Z, z0 + (+(ui.$('[data-depth]', box) || { value: 3 }).value));
       // Also keep a few lower zoom levels (very few tiles) so the area still shows when zoomed out.
       z0 = Math.max(2, z0 - 3);
@@ -396,8 +411,9 @@
     function render() {
       var list = areas(), p = plan();
       var names = { osm: 'street map', sat: 'satellite', places: 'place names', sea: 'sea marks' };
+      var osmNote = ctl.base() !== 'sat' ? '<p class="small onb-warn">' + icon('i-info') + ' The street map (OpenStreetMap) cannot be downloaded for offline use: its tile policy does not allow it. Areas you have viewed are still kept for a while. Switch to <b>Satellite</b> to save an area.</p>' : '';
       box.innerHTML = '<div class="card-title">' + icon('i-wifi-off') + 'Offline maps</div>' +
-        '<p class="small muted">Without signal the map still opens with a built-in world outline (coastlines and borders), and you can pick points on it. For streets or satellite offline, save an area first while online.</p>' +
+        '<p class="small muted">Without signal the map still opens with a built-in world outline (coastlines and borders), and you can pick points on it. Street-map areas you viewed recently stay available. To save satellite imagery for offline use, save an area while online.</p>' + osmNote +
         '<label class="field mt-12"><span>Detail to save</span><select data-depth>' +
         [[1, 'Light (+1 zoom level)'], [2, 'Medium (+2 levels)'], [3, 'Detailed (+3 levels)'], [4, 'Very detailed (+4 levels)']].map(function (o) { return '<option value="' + o[0] + '"' + (o[0] === (box._depth || 3) ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') +
         '</select><small class="hint" data-est></small></label>' +
@@ -408,7 +424,8 @@
         }).join('') + '</ul>' : '') +
         '<p class="small muted mt-8" data-usage></p>';
       var est = ui.$('[data-est]', box);
-      est.textContent = p.tiles.length + ' tiles, about ' + sizeLabel(estimateKB(p.tiles)) + ' · zoom ' + p.z0 + '–' + p.z1 + ' · ' + p.layers.map(function (l) { return names[l]; }).join(' + ') +
+      if (!p.layers.length) { est.textContent = 'Nothing to save with the street map. Switch to Satellite.'; ui.$('[data-dl]', box).disabled = true; }
+      else est.textContent = p.tiles.length + ' tiles, about ' + sizeLabel(estimateKB(p.tiles)) + ' · zoom ' + p.z0 + '–' + p.z1 + ' · ' + p.layers.map(function (l) { return names[l]; }).join(' + ') +
         (p.z0 >= MAX_Z ? ' · zoom out to save more area' : '');
       ui.$('[data-depth]', box).addEventListener('change', function (e) { box._depth = +e.target.value; render(); });
       ui.$('[data-dl]', box).addEventListener('click', start);
@@ -452,6 +469,8 @@
       }, function (e) { job = null; ui.toast(e.message); if (box.isConnected) render(); });
     }
     ctl.map.on('moveend zoomend', function () { if (!job && box.isConnected) { var est = ui.$('[data-est]', box); if (est) render(); } });
+    var sb = ui.$('[data-base]', view); if (sb) sb.addEventListener('click', function () { setTimeout(function () { if (!job && box.isConnected) render(); }, 0); });
+    purgeSavedOsm().then(function (n) { if (n && box.isConnected) { render(); drawRects(); } });
     drawRects(); render();
   }
 

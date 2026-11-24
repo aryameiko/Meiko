@@ -36,7 +36,8 @@
         '<div class="flex"><button class="btn btn-ghost btn-sm" data-update>' + icon('i-reset') + 'Check for updates</button><button class="btn btn-danger btn-sm" data-wipe>' + icon('i-trash') + 'Clear all local data</button></div>' +
         '<div class="small muted" data-sw></div></div></div>' +
         '<div class="card card-pad"><div class="flex" style="gap:14px"><svg class="logo" style="width:52px;height:52px"><use href="#logo"/></svg><div><div style="font-weight:800;letter-spacing:.28em;font-size:20px">MEIKO</div><div class="small muted" style="letter-spacing:.14em;text-transform:uppercase">Navigate • Calculate • Explore</div></div></div>' +
-        '<p class="mt-12 small" style="color:var(--text-2)">Maritime navigation and everyday utility tools. Version ' + MEIKO.VERSION + '. Works offline after the first visit; no account, no tracking, no paid services. Your data stays on this device.</p>' +
+        '<p class="mt-12 small" style="color:var(--text-2)">Maritime navigation and everyday utility tools. Version ' + MEIKO.VERSION + '. Works offline after the first visit. No ads, no analytics trackers, no paid services. Your account is kept by Firebase (Google); Fleet &amp; Chat is end-to-end encrypted over public relays; everything else stays on this device.</p>' +
+        '<p class="small"><a href="#/t/privacy">Privacy Policy</a> · <a href="#/t/terms">Terms of Use</a> · <a href="#/t/licenses">Licences &amp; Attribution</a></p>' +
         '<div class="section-title">Data status</div>' +
         '<ul class="list small">' +
         '<li><div class="grow"><b>Port coordinates</b><small>Sample harbour positions, not yet verified against official sources.</small></div><span class="badge warn">unverified</span></li>' +

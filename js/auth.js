@@ -72,8 +72,25 @@
       },
       redirected: function () { return redirected; },
       reset: function (email) { return F.sendPasswordResetEmail(fbAuth, email).catch(function (e) { throw fbErr(e); }); },
-      signOut: function () { return F.signOut(fbAuth).catch(function () {}); }
+      signOut: function () { return F.signOut(fbAuth).catch(function () {}); },
+      /** Delete the Firebase account. Firebase wants a recent sign-in, so confirm with the password or Google first. */
+      deleteAccount: function (pw) {
+        return Promise.resolve(fbAuth.authStateReady ? fbAuth.authStateReady() : null).then(function () {
+          var u = fbAuth.currentUser;
+          if (!u) throw new Error('Not signed in on this device. Sign in again (internet needed), then delete the account.');
+          var google = (u.providerData || []).some(function (x) { return x && x.providerId === 'google.com'; });
+          var re = google ? F.reauthenticateWithPopup(u, google_()) : F.reauthenticateWithCredential(u, F.EmailAuthProvider.credential(u.email, pw || ''));
+          return re.then(function () { return F.deleteUser(u); });
+        }).catch(function (e) {
+          var c = (e && e.code) || '';
+          if (/popup-closed-by-user|cancelled-popup-request|user-cancelled/.test(c)) { var x = new Error('Cancelled. Your account was not deleted.'); x.cancelled = true; throw x; }
+          if (/missing-password/.test(c)) throw new Error('Enter your password.');
+          if (/user-mismatch/.test(c)) throw new Error('Choose the same Google account you signed in with.');
+          throw e && e.code ? fbErr(e) : e;
+        });
+      }
     };
+    function google_() { return google(); }
     active = 'firebase';
     return true;
   }
@@ -110,6 +127,15 @@
     googleRedirect: function () { var pv = providers[active]; return pv.redirected ? pv.redirected().then(function (r) { return r ? switchTo(r) : null; }) : Promise.resolve(null); },
     resetPassword: function (email) { return providers[active].reset(String(email || '').trim().toLowerCase()); },
     signOut: function () { var pv = providers[active]; MEIKO.storage.remove(KEY); return pv.signOut ? pv.signOut() : Promise.resolve(); },
+    /** Record agreement to the Privacy Policy and Terms ({ v, at, age18 }). */
+    setConsent: function (c) { return save({ consent: c }); },
+    /** True when deleting needs the password (email + password accounts on Firebase). */
+    deleteNeedsPassword: function () { var p = profile(); return active === 'firebase' && !(p && p.via === 'google'); },
+    /** Delete the account on the server (Firebase), then remove the profile from this device. */
+    deleteAccount: function (pw) {
+      var pv = providers[active];
+      return Promise.resolve(pv.deleteAccount ? pv.deleteAccount(pw) : null).then(function () { MEIKO.storage.remove(KEY); return pv.signOut ? pv.signOut() : null; });
+    },
     /** Plug in another provider (e.g. Firebase) later: { id, label, verifies, register(email) → Promise<{email, verified, uid}> }. */
     use: function (p) { providers[p.id] = p; active = p.id; },
     provider: function () { return providers[active]; },

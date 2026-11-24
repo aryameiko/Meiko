@@ -63,7 +63,7 @@ External accuracy is estimated as HDOP × 5 m. Checksums are verified; bad sente
 - **GPS:** shows the current fix with its accuracy circle. It uses the same sources as the rest of the app: phone or external receiver.
 - **Offline:**
   - The service worker keeps tiles as you view them (`tiles-seen-v1`, newest ~2000).
-  - *Save visible area* downloads the visible area into `tiles-saved-v1` and keeps it until it is deleted. It saves a few zoom levels, capped at zoom 16 and 4000 tiles, two requests at a time, which keeps it within the OSM tile usage policy.
+  - *Save visible area* downloads the visible satellite area (plus sea marks if on) into `tiles-saved-v1` and keeps it until it is deleted. It saves a few zoom levels, capped at zoom 16 and 4000 tiles, two requests at a time. Since v1.12 the OpenStreetMap street map is never bulk-saved, because the OSMF tile usage policy forbids "download for offline" on tile.openstreetmap.org; OSM tiles saved by older versions are purged once.
   - With no signal the built-in outline is always available.
 - **Provider hook:** `MEIKO.map.addBaseLayer({ id, label, create(L) })` adds another base layer, for example Google Map Tiles once a key exists.
 - **Terms:** check the Esri imagery and OSM tile terms before commercial or high-traffic use. Self-hosted or paid tiles may be needed then.
@@ -146,7 +146,7 @@ Paste the Firebase web config into `js/firebase-config.js` (`MEIKO.FIREBASE_CONF
 - **Limits.** Both sides need internet; public relays can be slow or down; phones pause web apps in the background. It is not a safety or distress system: use VHF/DSC and AIS. A commercial version with guaranteed delivery and history would need a proper backend (for example Firebase or Supabase under the owner's account).
 - **Code.** Protocol and crypto in `js/core/fleet.js` (tests in `tests/fleet-tests.js` with an in-memory relay), UI in `js/modules/fleet.js`, signing library bundled in `js/vendor/nostr-crypto.js` (@noble/curves + @noble/hashes, MIT).
 
-## Fixes (v1.11.1)
+## Fixes (v1.12.1)
 
 - **GPS source Auto:** a running GPS watch (live navigation, *Track*, Fleet sharing) now moves to an external receiver when it is connected, and falls back to the phone GPS when the receiver is unplugged, instead of stopping. Changing the GPS source in Settings restarts a running watch on the new source.
 - **My Position → Track** keeps tracking through a short loss of GPS signal (like live navigation), instead of stopping on the first timeout.
@@ -172,6 +172,13 @@ Paste the Firebase web config into `js/firebase-config.js` (`MEIKO.FIREBASE_CONF
 - **Errors are shown, not corrected.** Where the table's two directions differ, both figures are shown. A figure shorter than the straight line between the ports is marked *doubtful*. Pairs missing from the tables are estimated by chaining table legs and labelled as estimates.
 - **Port positions (v1.8.4).** Positions are taken from published harbour points, in this order: the SMDG Terminal Code List, the Kemenhub/Dephub port point datasets, then the NGA World Port Index (1′ precision). Each record's `source` names where its position came from. Ranai, Teluk Ratai, Miangas and Dili have no source point and remain MEIKO estimates (`source: null`). A test checks that no port lies more than 4 km inland of the Natural Earth 10 m coastline (river ports such as Palembang, Pontianak and Banjarmasin are exempt). The offline base map is coarse, so at low zoom a harbour can still appear to sit on land.
 - **Unidentified codes.** P. Gundul, BLP, MAS and the eastern table's NATUNA could not be identified, so they have no position.
+
+## Privacy, terms and licences (v1.12)
+
+- `privacy.html` (Kebijakan Privasi, written against UU PDP No. 27/2022) and `terms.html` (Syarat Penggunaan) are plain public pages, so they can be linked from the Google OAuth consent screen. The app shows the same text from those files (`js/modules/legal.js`, tools `privacy`, `terms`, `licenses` under Settings). Both are in Bahasa Indonesia.
+- Onboarding requires a consent tick (age 18+ or parental consent, policy, terms, storage in Firebase outside Indonesia) before Google or email sign-up. It is saved in the profile as `consent: { v, at, age18 }`. When `MEIKO.legal.VERSION` changes, signed-in users must agree again.
+- Settings → Account → **Delete account** re-authenticates (password or Google), deletes the Firebase user (`deleteUser`), and wipes local storage, the Fleet file store and saved map tiles. The Firebase bundle now also exports `deleteUser`, `reauthenticateWithCredential`, `reauthenticateWithPopup` and `EmailAuthProvider`.
+- Not legal advice. Owner actions still open: PSE registration (Komdigi/OSS) if required, a contact email in the policy, the policy URL in the Google OAuth consent screen, Esri terms for satellite tiles, and confirming the TNI AL distance tables may be published.
 
 ## Accuracy & data status
 

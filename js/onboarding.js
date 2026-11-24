@@ -12,13 +12,21 @@
   var FB = MEIKO.auth.usesFirebase();
   var GOOGLE_G = '<svg class="g-logo" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>';
   var REQUIRED = FB;
-  var el = null, step = 0, draft = {}, mode = 'new';
+  var el = null, step = 0, draft = {}, mode = 'new', reconsent = false;
   var STEPS = ['welcome', 'account', 'nick', 'avatar', 'done'];
   var FIRST = 1, LAST = STEPS.length - 2; // steps with dots / back button
 
   function wants() {
     var preview = /[?&]welcome\b/.test(location.search) || location.hash === '#/welcome';
-    return preview || (REQUIRED && !MEIKO.auth.isComplete());
+    return preview || (REQUIRED && !MEIKO.auth.isComplete()) || needsConsent();
+  }
+  /** Signed-in users who have not yet agreed to the current Privacy Policy / Terms are asked once. */
+  function needsConsent() { return REQUIRED && MEIKO.auth.isComplete() && !MEIKO.legal.consent(); }
+  function consentCheck() { return '<div class="onb-consent">' + MEIKO.legal.checkboxHTML(draft.agreed) + '</div>'; }
+  function agreed() {
+    var c = el.querySelector('[data-consent]'); draft.agreed = !!(c && c.checked);
+    if (!draft.agreed) { err('Please tick the box to agree to the Privacy Policy and Terms of Use first.'); if (c) c.focus(); }
+    return draft.agreed;
   }
   function resumeStep() {
     var p = MEIKO.auth.profile();
@@ -33,14 +41,17 @@
     var t0 = v ? v.type : 'fishing', def = MEIKO.vessel.types.filter(function (x) { return x.id === t0; })[0].def;
     draft = { email: p.email || '', nick: p.nickname || '', vname: v ? v.name : '', type: t0, h: v ? v.h : def.h, s: v ? v.s : def.s, a: v ? v.a : def.a };
     step = resumeStep();
+    reconsent = needsConsent();
     el = document.createElement('div'); el.className = 'onb'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true'); el.setAttribute('aria-label', 'Welcome to MEIKO');
     document.body.appendChild(el); document.body.classList.add('onb-open');
+    MEIKO.legal.wireLinks(el); // once: el stays while the steps repaint
     paint();
     if (FB) MEIKO.auth.googleRedirect().then(function (p) { if (p && el) signedIn(p); });
   }
   function close() {
     if (!el) return;
     if (REQUIRED && !MEIKO.auth.isComplete()) return;
+    if (needsConsent()) return;
     el.remove(); el = null; document.body.classList.remove('onb-open');
     if (location.hash === '#/welcome') location.hash = '#/';
     if (/[?&]welcome\b/.test(location.search)) history.replaceState(null, '', location.pathname + location.hash);
@@ -57,7 +68,13 @@
 
   function paint() {
     var s = STEPS[step], h = '';
-    if (s === 'welcome') {
+    if (reconsent) {
+      s = 'consent';
+      h = '<div class="onb-hero"><img class="onb-full" src="assets/icons/logo-full.jpg" alt="MEIKO"></div>' +
+        '<h1>Privasi &amp; Syarat</h1><p class="onb-sub">MEIKO sekarang punya Kebijakan Privasi dan Syarat Penggunaan. Isinya menjelaskan data apa yang dipakai (akun di Firebase, Fleet &amp; Chat terenkripsi lewat relay publik, sisanya di perangkat Anda) dan batasan penting untuk navigasi. Mohon dibaca dan disetujui untuk melanjutkan.</p>' +
+        consentCheck() + '<small class="hint" data-err></small>' +
+        '<button class="btn btn-primary onb-next" data-agree>Setuju &amp; lanjutkan</button>';
+    } else if (s === 'welcome') {
       h = '<div class="onb-hero"><img class="onb-full" src="assets/icons/logo-full.jpg" alt="MEIKO"><div class="onb-tag">Navigate · Calculate · Explore</div></div>' +
         '<h1>Welcome aboard</h1><p class="onb-sub">Register with your email, then choose a nickname and your vessel. Other vessels in Fleet &amp; Chat see your nickname and vessel, never your email.</p>' +
         '<button class="btn btn-primary onb-next" data-next>Get started</button>' +
@@ -66,6 +83,7 @@
       if (FB) {
         var isNew = mode === 'new';
         h = head(isNew ? 'Create your account' : 'Sign in', isNew ? 'Use your Google account, or an email and a password.' : 'Use your Google account, or the email and password you registered with.') +
+          consentCheck() +
           '<button type="button" class="btn btn-ghost onb-google" data-google>' + GOOGLE_G + (isNew ? 'Continue with Google' : 'Sign in with Google') + '</button>' +
           '<div class="onb-or"><span>or with email</span></div>' +
           '<div class="onb-seg" role="tablist"><button type="button" role="tab" class="' + (isNew ? 'on' : '') + '" data-mode="new">Create account</button><button type="button" role="tab" class="' + (isNew ? '' : 'on') + '" data-mode="old">I have an account</button></div>' +
@@ -78,7 +96,7 @@
       } else {
         h = head('Your email', 'Used to register you in MEIKO.') +
           '<label class="field"><span>Email</span><input type="email" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" data-email placeholder="name@example.com" value="' + esc(draft.email) + '"><small class="hint" data-err></small></label>' +
-          '<p class="small muted">' + icon('i-info') + ' Preview: the email is kept on this device only; no verification email is sent.</p>' +
+          '<p class="small muted">' + icon('i-info') + ' Preview: the email is kept on this device only; no verification email is sent.</p>' + consentCheck() +
           '<button class="btn btn-primary onb-next" data-next>Continue</button>';
       }
     } else if (s === 'nick') {
@@ -98,15 +116,17 @@
     }
     el.innerHTML = '<div class="onb-card onb-step-' + s + '">' + h + '</div>';
     bind();
-    var f = el.querySelector('input'); if (f && matchMedia('(pointer:fine)').matches) f.focus();
+    var f = el.querySelector('input:not([type=checkbox])'); if (f && matchMedia('(pointer:fine)').matches) f.focus();
   }
   function err(msg, ok) {
     var e = el.querySelector('[data-err]'); if (e) { e.textContent = msg; e.classList.toggle('err', !ok); e.classList.toggle('ok', !!ok); }
-    if (!ok) { var i = el.querySelector('input'); if (i) { i.classList.add('invalid'); i.focus(); } }
+    if (!ok) { var i = el.querySelector('input:not([type=checkbox])'); if (i && !/tick the box/.test(msg)) { i.classList.add('invalid'); i.focus(); } }
   }
   function busy(on) { el.querySelectorAll('button').forEach(function (b) { b.disabled = on; }); }
   /** After any sign-in: keep the email, prefill the nickname, and skip the steps already done. */
   function signedIn(p) {
+    if (draft.agreed || MEIKO.storage.get('consent:pending', false)) { MEIKO.legal.recordConsent(); p = MEIKO.auth.profile() || p; }
+    MEIKO.storage.remove('consent:pending');
     draft.email = p.email || draft.email;
     if (p.nickname) draft.nick = p.nickname; else if (!draft.nick && p.suggestedNick) draft.nick = p.suggestedNick;
     if (p.nickname && MEIKO.vessel.get()) { step = STEPS.indexOf('done'); var v = MEIKO.vessel.get(); draft.vname = v.name || ''; draft.type = v.type; draft.h = v.h; draft.s = v.s; draft.a = v.a; }
@@ -117,9 +137,10 @@
     var s = STEPS[step];
     if (s === 'account') {
       var em = el.querySelector('[data-email]').value.trim();
+      if (!agreed()) return;
       if (!MEIKO.auth.validEmail(em)) return err('Enter a valid email address, e.g. name@example.com');
       draft.email = em.toLowerCase();
-      if (!FB) { busy(true); return MEIKO.auth.register(em).then(function (p) { draft.email = p.email; step++; paint(); }, function (e) { busy(false); err(e.message); }); }
+      if (!FB) { busy(true); return MEIKO.auth.register(em).then(function (p) { MEIKO.legal.recordConsent(); draft.email = p.email; step++; paint(); }, function (e) { busy(false); err(e.message); }); }
       var pw = el.querySelector('[data-pw]').value;
       if (mode === 'new') {
         if (pw.length < 8) return err('Password: at least 8 characters.');
@@ -154,6 +175,8 @@
     var b = el.querySelector('[data-next]'); if (b) b.addEventListener('click', next);
     el.querySelectorAll('input').forEach(function (i) { i.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); next(); } }); i.addEventListener('input', function () { i.classList.remove('invalid'); var e = el.querySelector('[data-err]'); if (e) e.textContent = ''; }); });
     var bk = el.querySelector('[data-back]'); if (bk) bk.addEventListener('click', back);
+    var ag = el.querySelector('[data-agree]'); if (ag) ag.addEventListener('click', function () { if (!agreed()) return; MEIKO.legal.recordConsent(); reconsent = false; close(); });
+    var cb = el.querySelector('[data-consent]'); if (cb) cb.addEventListener('change', function () { draft.agreed = cb.checked; var e = el.querySelector('[data-err]'); if (e && cb.checked) e.textContent = ''; });
     var si = el.querySelector('[data-signin]'); if (si) si.addEventListener('click', function () { mode = 'old'; step = STEPS.indexOf('account'); paint(); });
     el.querySelectorAll('[data-mode]').forEach(function (x) { x.addEventListener('click', function () { keep(); mode = x.dataset.mode; paint(); }); });
     var fg = el.querySelector('[data-forgot]'); if (fg) fg.addEventListener('click', function () {
@@ -162,7 +185,9 @@
       busy(true); MEIKO.auth.resetPassword(em).then(function () { busy(false); err('A password reset link was sent to ' + em + '.', true); }, function (e) { busy(false); err(e.message); });
     });
     var gg = el.querySelector('[data-google]'); if (gg) gg.addEventListener('click', function () {
-      busy(true); MEIKO.auth.signInGoogle().then(signedIn, function (e) { busy(false); if (!e.cancelled) err(e.message); });
+      if (!agreed()) return;
+      MEIKO.storage.set('consent:pending', true); // survives the redirect fallback
+      busy(true); MEIKO.auth.signInGoogle().then(signedIn, function (e) { busy(false); MEIKO.storage.remove('consent:pending'); if (!e.cancelled) err(e.message); });
     });
     var ot = el.querySelector('[data-other]'); if (ot) ot.addEventListener('click', function () { MEIKO.auth.signOut(); draft.email = ''; mode = 'new'; step = STEPS.indexOf('account'); paint(); });
     el.querySelectorAll('[data-type]').forEach(function (x) { x.addEventListener('click', function () { keep(); var t = MEIKO.vessel.types.filter(function (y) { return y.id === x.dataset.type; })[0]; draft.type = t.id; draft.h = t.def.h; draft.s = t.def.s; draft.a = t.def.a; paint(); }); });
@@ -171,6 +196,7 @@
   function keep() { // remember typed values when moving between steps
     var e = el.querySelector('[data-email]'); if (e) draft.email = e.value.trim();
     var n = el.querySelector('[data-nick]'); if (n) draft.nick = n.value.trim();
+    var c = el.querySelector('[data-consent]'); if (c) draft.agreed = c.checked;
     var v = el.querySelector('[data-vname]'); if (v) draft.vname = v.value.trim();
   }
   /* Going on/offline only updates the note: repainting would wipe a typed password and re-enable buttons mid sign-in. */
