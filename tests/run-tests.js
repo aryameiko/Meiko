@@ -526,7 +526,7 @@ test('Sea distance: implausible figure flagged, route estimate through table leg
   var co = {}; ports.all().forEach(function (p) { co[p.id] = p; });
   var S = seadist.create(distT, function (a, b) { var A = co[distT.PLACES[a].port], B = co[distT.PLACES[b].port]; return A && B ? geo.haversine(A.lat, A.lon, B.lat, B.lon) / 1852 : null; });
   var e = S.pair('tpriok', 'ambon').filter(function (x) { return x.table === 'wiltim'; })[0]; assert.strictEqual(e.ab, 353); assert.ok(!e.okAB, 'TPK–AMB 353 NM < straight line');
-  var r = S.route('dumai', 'jayapura'); assert.ok(r && r.path.length >= 3 && r.nm > 2000, JSON.stringify(r));
+  var r = S.route('nias', 'nabire'); assert.ok(r && r.path.length >= 3 && r.nm > 2000, JSON.stringify(r));
   assert.ok(S.neighbours('surabaya').length >= 37);
 });
 
