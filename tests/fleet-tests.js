@@ -200,6 +200,18 @@ module.exports = function run(test) {
       });
   });
 
+  t('Fleet: navigational status travels with the live message; invalid codes are dropped', function () {
+    assert.strictEqual(fleet.sanitize({ k: 'live', ns: 1 }).ns, 1);
+    assert.strictEqual(fleet.sanitize({ k: 'live', ns: 8 }).ns, 8);
+    assert.strictEqual(fleet.sanitize({ k: 'live', ns: 15 }).ns, null);
+    assert.strictEqual(fleet.sanitize({ k: 'live', ns: '1' }).ns, null);
+    assert.strictEqual(fleet.navStatus(1).label, 'At anchor');
+    var relay = new MockRelay(), a = client(relay, 'MEIKO-STAT-0009'), b = client(relay, 'MEIKO-STAT-0009');
+    return Promise.all([a.start(), b.start()]).then(function () { return wait(20); })
+      .then(function () { return a.sendLive({ name: 'A', ns: 7 }); }).then(function () { return wait(40); })
+      .then(function () { assert.strictEqual(b.got.live[0].ns, 7); a.stop(); b.stop(); });
+  });
+
   return tests.reduce(function (p, tc) {
     return p.then(function () { return test(tc[0], tc[1]); });
   }, Promise.resolve());

@@ -21,6 +21,19 @@
   var DEFAULT_RELAYS = ['wss://relay.damus.io', 'wss://nos.lol', 'wss://relay.primal.net', 'wss://offchain.pub'];
   var CHAT_TTL_S = 3 * 86400, HISTORY_S = 2 * 86400;
   var VESSEL_TYPES = ['sailboat', 'pinisi', 'speedboat', 'passenger', 'cargo', 'tanker', 'fishing', 'tug'];
+  /** Navigational status, AIS codes 0–8 (ITU-R M.1371). */
+  var NAV_STATUS = [
+    { code: 0, label: 'Under way using engine', short: 'Under way', icon: '▶' },
+    { code: 8, label: 'Under way sailing', short: 'Sailing', icon: '⛵' },
+    { code: 1, label: 'At anchor', short: 'At anchor', icon: '⚓' },
+    { code: 5, label: 'Moored / in port', short: 'Moored', icon: '⛓' },
+    { code: 7, label: 'Engaged in fishing', short: 'Fishing', icon: '🎣' },
+    { code: 3, label: 'Restricted manoeuvrability', short: 'Restricted', icon: '◆' },
+    { code: 4, label: 'Constrained by her draught', short: 'Draught', icon: '▼' },
+    { code: 2, label: 'Not under command', short: 'NUC', icon: '●●' },
+    { code: 6, label: 'Aground', short: 'Aground', icon: '⚠' }
+  ];
+  function navStatus(code) { return NAV_STATUS.filter(function (x) { return x.code === code; })[0] || null; }
   var CHUNK = 16000, MAX_FILE = 512 * 1024, MAX_PARTS = Math.ceil(MAX_FILE / CHUNK);
   var CODE_ALPHA = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
@@ -109,6 +122,7 @@
     var v = p.v && typeof p.v === 'object' ? p.v : null;
     out.vessel = v && VESSEL_TYPES.indexOf(v.type) >= 0 ? { type: v.type, h: colour(v.h), s: colour(v.s), a: colour(v.a) } : null;
     if (k === 'chat') { out.text = str(p.text, 500); out.att = sanitizeAtt(p.att); if (!out.text && !out.att) return null; }
+    if (k === 'live') { var ns = num(p.ns, 0, 8); out.ns = ns != null && ns % 1 === 0 ? ns : null; }
     if (k === 'live' && p.pos && typeof p.pos === 'object') {
       var lat = num(p.pos.lat, -90, 90), lon = num(p.pos.lon, -180, 180);
       if (lat != null && lon != null) out.pos = { lat: lat, lon: lon, cog: num(p.pos.cog, 0, 360), sog: num(p.pos.sog, 0, 99), t: num(p.pos.t, 0, 1e13), acc: num(p.pos.acc, 0, 1e6) };
@@ -283,6 +297,6 @@
     };
   }
 
-  return { KIND_LIVE: KIND_LIVE, KIND_CHAT: KIND_CHAT, CHUNK: CHUNK, MAX_FILE: MAX_FILE, DEFAULT_RELAYS: DEFAULT_RELAYS, normCode: normCode, codeOk: codeOk, newCode: newCode,
+  return { KIND_LIVE: KIND_LIVE, KIND_CHAT: KIND_CHAT, NAV_STATUS: NAV_STATUS, navStatus: navStatus, CHUNK: CHUNK, MAX_FILE: MAX_FILE, DEFAULT_RELAYS: DEFAULT_RELAYS, normCode: normCode, codeOk: codeOk, newCode: newCode,
     deriveRoom: deriveRoom, pairKey: pairKey, safetyCode: safetyCode, shortId: shortId, encrypt: encrypt, decrypt: decrypt, signEvent: signEvent, verifyEvent: verifyEvent, sanitize: sanitize, createClient: createClient };
 });

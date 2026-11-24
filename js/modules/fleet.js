@@ -34,11 +34,13 @@
 
   function onFix(f) {
     if (!f || !isFinite(f.lat)) return;
-    if (st.fix && C.geo.haversine(st.fix.lat, st.fix.lon, f.lat, f.lon) > 30) st.prevFix = st.fix;
-    st.fix = f;
+    if (st.fix && C.geo.haversine(st.fix.lat, st.fix.lon, f.lat, f.lon) > 30) { st.prevFix = st.fix; st.lastMove = Date.now(); }
+    if (!st.lastMove) st.lastMove = Date.now();
+    st.fix = f; trackSlow();
     if (cfg().share && (!st.posSent || Date.now() - st.lastSent > MIN_GAP_MS * 1.5)) beat();
     if (cfg().share) emit('status');
   }
+  function trackSlow() { var cs = cogSog(); if (cs.sog != null && cs.sog < 0.5) { if (!st.slowSince) st.slowSince = Date.now(); } else if (cs.sog != null) st.slowSince = 0; }
   function cogSog() {
     var f = st.fix, cog = null, sog = null;
     if (f.speed != null && isFinite(f.speed)) sog = f.speed * 1.943844;
@@ -52,7 +54,7 @@
   function beat() {
     if (!st.client) return;
     var p = me(), c = cfg();
-    p.k = 'live';
+    p.k = 'live'; if (c.ns != null) p.ns = c.ns;
     if (c.share && st.fix && Date.now() - (st.fix.timestamp || 0) < 5 * 60 * 1000) {
       var cs = cogSog();
       p.pos = { lat: Math.round(st.fix.lat * 1e5) / 1e5, lon: Math.round(st.fix.lon * 1e5) / 1e5, cog: cs.cog, sog: cs.sog, t: st.fix.timestamp, acc: st.fix.accuracy != null ? Math.round(st.fix.accuracy) : null };
@@ -164,7 +166,7 @@
         if (p.me) return;
         if (p.k === 'bye') { if (st.peers[p.from]) { st.peers[p.from].left = true; st.peers[p.from].at = p.at; } emit('peers'); return; }
         var old = st.peers[p.from] || {};
-        st.peers[p.from] = { id: p.from, name: p.name, callsign: p.callsign, vessel: p.vessel, pos: p.pos || (old.pos && Date.now() - old.pos.seen < 2 * 3600 * 1000 ? old.pos : null), at: Math.max(p.at, old.at || 0), left: false };
+        st.peers[p.from] = { id: p.from, name: p.name, callsign: p.callsign, vessel: p.vessel, ns: p.ns, pos: p.pos || (old.pos && Date.now() - old.pos.seen < 2 * 3600 * 1000 ? old.pos : null), at: Math.max(p.at, old.at || 0), left: false };
         if (p.pos) st.peers[p.from].pos.seen = p.at;
         emit('peers');
       },
@@ -257,6 +259,8 @@
         '<div class="fleet-head"><div><div class="label">Group</div><b class="fleet-code" data-codeview></b></div><button type="button" class="btn btn-ghost btn-sm" data-share-code>' + icon('i-copy') + 'Share code</button></div>' +
         '<div class="fleet-status" data-status></div>' +
         '<label class="fleet-switch"><input type="checkbox" data-share> <span><b>Share my position</b><small data-share-hint></small></span></label>' +
+        '<label class="field"><span>My status</span><select data-ns><option value="">— not set —</option>' + C.fleet.NAV_STATUS.map(function (x) { return '<option value="' + x.code + '">' + x.icon + '  ' + esc(x.label) + '</option>'; }).join('') + '</select><small class="hint">Shown to the group next to your vessel, like AIS.</small></label>' +
+        '<div data-ns-suggest></div>' +
         '<div class="port-map-wrap"><div class="map-box port-map fleet-map" data-fmap></div></div>' +
         '<div data-peers></div>' +
         '<div class="fleet-chat"><div class="label">Chat</div><div class="chat-tabs" data-tabs role="tablist"></div><div data-dmhead></div><div class="chat-list" data-chat aria-live="polite"></div>' +
@@ -289,13 +293,22 @@
           (st.joining ? 'Connecting…' : s.connected ? 'Connected (' + s.connected + '/' + s.relays + ' relays)' : navigator.onLine === false ? 'Offline: waiting for internet' : 'Connecting to relays…') +
           ' · ' + n + ' other vessel' + (n === 1 ? '' : 's') + ' online';
         $('[data-share]').checked = sh;
+        var nsSel = $('[data-ns]'), cns = cfg().ns; if (document.activeElement !== nsSel) nsSel.value = cns == null ? '' : String(cns);
+        var sug = '', cs = st.fix && sh ? cogSog() : null;
+        if (cs) {
+          var still = cs.sog != null ? cs.sog < 0.5 && st.slowSince && Date.now() - st.slowSince > 5 * 60 * 1000 : st.lastMove && Date.now() - st.lastMove > 5 * 60 * 1000;
+          if (still && (cns == null || cns === 0 || cns === 8)) sug = '<div class="ns-sug">You have not moved for a while. Set status to <button type="button" class="chip" data-setns="1">⚓ At anchor</button> <button type="button" class="chip" data-setns="5">⛓ Moored</button></div>';
+          else if (cs.sog != null && cs.sog > 2 && (cns === 1 || cns === 5 || cns === 6)) sug = '<div class="ns-sug">You are moving (' + kn(cs.sog) + '). Set status to <button type="button" class="chip" data-setns="0">▶ Under way</button> <button type="button" class="chip" data-setns="8">⛵ Sailing</button></div>';
+        }
+        $('[data-ns-suggest]').innerHTML = sug;
         $('[data-share-hint]').textContent = sh ? (st.fix ? 'On. Others in this group see your position, COG and SOG.' : 'On. Waiting for a GPS fix…') : 'Off. Others see your name only, not where you are.';
       }
+      function nsBadge(p) { var x = p.ns != null && C.fleet.navStatus(p.ns); return x ? '<span class="ns-badge ns-' + x.code + '">' + x.icon + ' ' + esc(x.short) + '</span>' : ''; }
       function peerRow(p) {
         var dist = '';
         if (p.pos && st.fix) { var g = C.geo.greatCircle(st.fix.lat, st.fix.lon, p.pos.lat, p.pos.lon); dist = ui.num(g.distanceNM, g.distanceNM < 10 ? 2 : 1) + ' NM · ' + ui.bearing(g.initialBearing) + ' T'; }
         return '<div class="fleet-peer' + (online(p) ? '' : ' off') + '"><button type="button" class="fp-btn" data-peer="' + esc(p.id) + '">' +
-          '<span class="dot ' + (online(p) ? 'ok' : '') + '"></span><span class="fp-main"><b>' + esc(p.name) + (p.callsign ? ' <small>' + esc(p.callsign) + '</small>' : '') + '</b>' +
+          '<span class="dot ' + (online(p) ? 'ok' : '') + '"></span><span class="fp-main"><b>' + esc(p.name) + ' ' + nsBadge(p) + (p.callsign ? ' <small>' + esc(p.callsign) + '</small>' : '') + '</b>' +
           '<small>' + (p.pos ? 'COG ' + deg(p.pos.cog) + ' · SOG ' + kn(p.pos.sog) + (dist ? ' · ' + dist : '') : 'Position not shared') + '</small></span>' +
           '<small class="fp-seen">' + (p.left ? 'left · ' : '') + (online(p) ? 'online' : ago(p.at)) + '<br><span class="fp-id">ID ' + C.fleet.shortId(p.id) + '</span></small></button>' +
           '<button type="button" class="btn btn-ghost btn-sm fp-dm" data-dm="' + esc(p.id) + '" aria-label="Chat with ' + esc(p.name) + '">' + icon('i-chat') + 'Chat' + (st.unread[p.id] ? ' <span class="badge-n">' + st.unread[p.id] + '</span>' : '') + '</button></div>';
@@ -372,7 +385,7 @@
           var v = vesselOf(p), moving = p.pos.sog == null || p.pos.sog > 0.5, hdg = moving ? p.pos.cog : null;
           var icon = v ? L.divIcon({ className: 'mk vsl-mk' + (online(p) ? '' : ' stale'), html: MEIKO.vessel.markerHTML(v, hdg), iconSize: hdg != null ? [34, 68] : [76, 46], iconAnchor: hdg != null ? [17, 34] : [38, 39] })
             : L.divIcon({ className: 'mk pm-dot fleet-dot' + (online(p) ? '' : ' stale'), iconSize: [16, 16], iconAnchor: [8, 8] });
-          var tip = '<b>' + esc(p.name) + '</b> · ' + (online(p) ? 'online' : ago(p.pos.seen || p.at)) + '<br>COG ' + deg(p.pos.cog) + ' · SOG ' + kn(p.pos.sog);
+          var tip = '<b>' + esc(p.name) + '</b> ' + nsBadge(p) + ' · ' + (online(p) ? 'online' : ago(p.pos.seen || p.at)) + '<br>COG ' + deg(p.pos.cog) + ' · SOG ' + kn(p.pos.sog);
           var ll = [p.pos.lat, p.pos.lon]; pts.push(ll);
           if (!markers[p.id]) added = markers[p.id] = L.marker(ll, { icon: icon, keyboard: false, title: p.name }).bindTooltip(tip, { permanent: true, direction: 'top', offset: [0, -10], className: 'pm-label fleet-label', interactive: true })
             .on('click', (function (pid) { return function (e) { L.DomEvent.stop(e); vesselSheet(pid); }; })(p.id)).addTo(fm.map);
@@ -402,6 +415,9 @@
         join($('[data-code]').value).then(function () { btn.disabled = false; }, function (e) { btn.disabled = false; ui.toast(e.message); });
       });
       $('[data-leave]').addEventListener('click', function () { if (fm) { try { fm.map.remove(); } catch (e) {} } fm = null; markers = {}; leave(); });
+      $('[data-ns]').addEventListener('change', function (e) { setNS(e.target.value === '' ? null : +e.target.value); });
+      view.addEventListener('click', function (e) { var b = e.target.closest('[data-setns]'); if (b) { setNS(+b.dataset.setns); st.slowSince = 0; st.lastMove = Date.now(); } });
+      function setNS(v) { saveCfg({ ns: v }); beat(); paintStatus(); var x = v != null && C.fleet.navStatus(v); ui.toast(x ? 'Status: ' + x.label : 'Status cleared'); }
       $('[data-share]').addEventListener('change', function (e) { setShare(e.target.checked); });
       $('[data-share-code]').addEventListener('click', function () {
         var code = cfg().code, text = 'Join my MEIKO group: open Fleet & Chat at ' + location.origin + location.pathname + ' and enter the code ' + code;
@@ -458,7 +474,9 @@
       function vesselSheet(id) {
         var p = st.peers[id]; if (!p) return;
         var v = vesselOf(p), t = v && MEIKO.vessel.types.filter(function (x) { return x.id === v.type; })[0], rows = [];
-        rows.push(['Status', online(p) ? '<span class="dot ok"></span> online' : (p.left ? 'left the group · ' : 'last seen ') + ago(p.at)]);
+        var nsx = p.ns != null && C.fleet.navStatus(p.ns);
+        rows.push(['Nav status', nsx ? '<span class="ns-badge ns-' + nsx.code + '">' + nsx.icon + ' ' + esc(nsx.label) + '</span>' : 'Not set']);
+        rows.push(['Online', online(p) ? '<span class="dot ok"></span> online' : (p.left ? 'left the group · ' : 'last seen ') + ago(p.at)]);
         if (t) rows.push(['Vessel type', esc(t.label)]);
         if (p.callsign) rows.push(['Call sign', esc(p.callsign)]);
         if (p.pos) {
