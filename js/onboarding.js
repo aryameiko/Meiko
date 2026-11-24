@@ -57,7 +57,7 @@
   function paint() {
     var s = STEPS[step], h = '';
     if (s === 'welcome') {
-      h = '<div class="onb-hero"><svg class="onb-logo" aria-hidden="true"><use href="#logo"/></svg><div class="onb-brand">MEIKO</div><div class="onb-tag">Navigate · Calculate · Explore</div></div>' +
+      h = '<div class="onb-hero"><img class="onb-full" src="assets/icons/logo-full.jpg" alt="MEIKO"><div class="onb-tag">Navigate · Calculate · Explore</div></div>' +
         '<h1>Welcome aboard</h1><p class="onb-sub">Register with your email, then choose a nickname and your vessel. Other vessels in Fleet &amp; Chat see your nickname and vessel, never your email.</p>' +
         '<button class="btn btn-primary onb-next" data-next>Get started</button>' +
         (FB ? '<button class="btn btn-ghost onb-alt" data-signin>I already have an account</button>' : '');
