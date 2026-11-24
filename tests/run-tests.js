@@ -458,5 +458,45 @@ test('Live: BRG/DTW/XTE, ETA from SOG with planned-speed fallback, arrival', fun
   assert.strictEqual(live.startIndex(pts, { lat: 0, lon: -1 }), 0);
 });
 
+/* ---------- Stars: celestial navigation & plate solving ---------- */
+var cel = core('celestial'), ps = core('platesolve'), starsData = require(path.join(__dirname, '..', 'js', 'data', 'stars-data.js'));
+test('GMST: J2000.0 = 280.46062°, Meeus ex. 12.a (1987-04-10 0h) = 197.69320°', function () {
+  near(cel.gmst(2451545.0), 280.46062, 1e-4); near(cel.gmst(2446895.5), 197.693195, 1e-5);
+});
+test('Precession J2000 → date: Meeus ex. 21.b (θ Persei)', function () {
+  var r = cel.precess(41.054063, 49.227750, 2462088.69); near(r.ra, 41.54721, 2e-4); near(r.dec, 49.34848, 2e-4);
+});
+test('Refraction at 10° ≈ 5.3′, dip for 3 m = 3.05′', function () {
+  near(cel.refraction(10), 5.35, 0.1); near(cel.dip(3), 3.05, 0.01);
+});
+test('Star fix: exact altitudes from a known position → that position', function () {
+  var t = Date.UTC(2026, 10, 24, 12, 0, 0), stars = [[344.4127, -29.6222], [297.6958, 8.8683], [24.4285, -57.2368], [310.358, 45.2803]];
+  var sights = stars.map(function (s, i) { var ms = t + i * 60000; return { ra: s[0], dec: s[1], ms: ms, ho: cel.altaz(s[0], s[1], -6.2, 106.9, ms).alt }; });
+  var r = cel.fix(sights, { lat: -5, lon: 108 }); near(r.lat, -6.2, 1e-6); near(r.lon, 106.9, 1e-6); assert.ok(r.rmsNM < 0.01);
+});
+test('Plate solve: synthetic star field (60° lens, 2% distortion, noise, false stars) → correct pointing', function () {
+  var cat = starsData.STARS.map(function (s) { return { id: s[0], ra: s[1], dec: s[2], mag: s[3] }; });
+  var idx = ps.buildIndex(cat, { indexMag: 4.2, maxSideDeg: 20 });
+  var z = ps.vec(83.8, -5.4), x = ps.norm(ps.cross(z, [0, 0, 1])), y = ps.cross(z, x);
+  var R = [x[0], y[0], z[0], x[1], y[1], z[1], x[2], y[2], z[2]], w = 1200, h = 900, f = 600 / Math.tan(30 * Math.PI / 180);
+  var sol0 = { R: R, f: f, cx: 600, cy: 450, hw: 600, k: 0 }, seed = 9, rnd = function () { return (seed = seed * 16807 % 2147483647) / 2147483647; };
+  var dets = [];
+  cat.forEach(function (s) { if (s.mag > 4.3) return; var p = ps.project(sol0, s.ra, s.dec); if (!p) return; var dx = (p.x - 600) / 600, dy = (p.y - 450) / 600, k = 1 - 0.02 * (dx * dx + dy * dy);
+    var X = 600 + (p.x - 600) * k + rnd() - 0.5, Y = 450 + (p.y - 450) * k + rnd() - 0.5; if (X > 4 && Y > 4 && X < w - 4 && Y < h - 4) dets.push({ x: X, y: Y, flux: Math.pow(10, -0.4 * s.mag) * (0.7 + 0.6 * rnd()) }); });
+  for (var i = 0; i < 5; i++) dets.push({ x: rnd() * w, y: rnd() * h, flux: 0.02 });
+  dets.sort(function (a, b) { return b.flux - a.flux; });
+  var r = ps.solve(dets.slice(0, 60), w, h, cat, { index: idx, K: 20 });
+  assert.ok(r.ok, 'solved'); assert.ok(ps.ang(ps.vec(r.center.ra, r.center.dec), z) * 180 / Math.PI < 0.1, 'pointing'); near(r.fovX, 60, 0.6);
+});
+test('Plate solve: random points are rejected, not matched', function () {
+  var cat = starsData.STARS.map(function (s) { return { id: s[0], ra: s[1], dec: s[2], mag: s[3] }; });
+  var idx = ps.buildIndex(cat, { indexMag: 4.2, maxSideDeg: 20 }), seed = 4, rnd = function () { return (seed = seed * 16807 % 2147483647) / 2147483647; };
+  var dets = []; for (var i = 0; i < 40; i++) dets.push({ x: rnd() * 1200, y: rnd() * 900, flux: 40 - i });
+  assert.ok(!ps.solve(dets, 1200, 900, cat, { index: idx, K: 20, budgetMs: 3000 }).ok);
+});
+test('Star catalogue: 58 navigational stars present (57 + Polaris)', function () {
+  assert.strictEqual(Object.keys(starsData.NAV).length, 58); assert.ok(Object.keys(starsData.CONS).length === 88);
+});
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed\n');
 process.exit(failed ? 1 : 0);

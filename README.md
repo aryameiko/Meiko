@@ -114,6 +114,18 @@ The live navigation panel sits under the map, on both the Map page and the Track
 - **Signal loss:** the panel keeps showing the last fix and keeps trying.
 - **Saved state:** the route being followed is stored under `nav:active`, so it survives reloads and works offline.
 
+## Stars & constellations (v1.7)
+
+Three tools under **Astronomy**, all offline:
+
+- **Star Photo · Identify & Position.** Take or choose a night-sky photo. MEIKO detects the stars, matches triangle shapes against an offline Hipparcos catalogue (`js/core/platesolve.js`), and overlays constellation lines and names (with Indonesian names such as Gubuk Penceng, Waluku, Biduk, Kalajengking). It marks the celestial pole, or shows an arrow toward it: the horizon point below the pole is true north or south, and finding it needs no time or position. With the photo time (read from EXIF when present) and an approximate position, it also gives the camera bearing. If the sea horizon is in the photo, the user taps it at two points. Each star then becomes an altitude, corrected for dip and refraction, and a least-squares fix gives a **rough** position (tens of NM).
+  - A match is accepted only when far more catalogue stars land on detections than chance would allow. Random points are rejected rather than guessed.
+  - Planets and the Moon are not identified.
+- **Sky Chart · Constellations.** A polar chart of the sky for a given time and position, plus the navigational stars with their altitude and bearing, and cues from Polaris and Crux.
+- **Star Sight Reduction · Fix.** Enter sextant Hs, time, IE and height of eye for 2 to 8 stars. MEIKO gives Ho, Hc, Zn and the intercept for each, a least-squares fix and a plot of the lines of position.
+
+Star positions use GMST (IAU 1982) and precession (IAU 1976). Nutation, aberration and proper motion are ignored, which leaves an error of about 1′. Data come from d3-celestial (BSD-3, HYG/Hipparcos); see `js/data/LICENSE-d3-celestial`.
+
 ## Accuracy & data status
 
 - **Port coordinates: sample / unverified.** Approximate harbour positions; each record has `verified: false`. Verify against official charts / port authority data, then set `verified: true` and `source`.
