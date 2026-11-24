@@ -153,6 +153,11 @@ Paste the Firebase web config into `js/firebase-config.js` (`MEIKO.FIREBASE_CONF
 - **General Group**: the public fleet's group chat, opt-in (`cfg.general`, *Join General Group*). Not private (public key), not moderated: tap a name → **Block** (`cfg.blocked`, hides vessel and messages on this phone) or **Report** (prefilled GitHub issue with the vessel ID). Private groups with a code still exist.
 - Privacy Policy and Terms updated (version `2026-11-24.2`); signed-in users are asked to agree once more.
 
+## Fixes (v1.13.1)
+
+- **Fleet flood guard:** the public fleet is open to everyone, so at most 8 messages per vessel per minute are accepted (group and private); more are dropped.
+- **Storage:** photos, videos and files received in Fleet & Chat are deleted from the phone after 3 days (the relays drop chat after the same time). Vessels not heard from for 6 hours are removed from the list.
+
 ## Fixes (v1.12.1)
 
 - **GPS source Auto:** a running GPS watch (live navigation, *Track*, Fleet sharing) now moves to an external receiver when it is connected, and falls back to the phone GPS when the receiver is unplugged, instead of stopping. Changing the GPS source in Settings restarts a running watch on the new source.
