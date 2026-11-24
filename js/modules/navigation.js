@@ -97,60 +97,134 @@
   });
 
   /* ======================= B. Port to port ======================= */
+  var SEA = null;
+  function placeList() {
+    var D = MeikoData.distances, byPort = {}, list = [];
+    Object.keys(D.PLACES).forEach(function (k) { var pl = D.PLACES[k]; if (pl.port) byPort[pl.port] = k; });
+    MeikoData.ports.all().forEach(function (p) {
+      var k = byPort[p.id] || null, pl = k ? D.PLACES[k] : null;
+      list.push({ value: p.id, name: p.name, city: p.city, port: p, key: k, note: pl && pl.note,
+        hay: [p.name, p.city, p.country].concat(p.aliases || [], pl ? pl.aliases : []).join(' ').toLowerCase() });
+    });
+    Object.keys(D.PLACES).forEach(function (k) {
+      var pl = D.PLACES[k]; if (pl.port && MeikoData.ports.byId(pl.port)) return;
+      list.push({ value: 't:' + k, name: pl.name, city: pl.area, port: null, key: k, note: pl.note, hay: [pl.name, pl.area].concat(pl.aliases).join(' ').toLowerCase() });
+    });
+    return list.sort(function (a, b) { return a.name.localeCompare(b.name); });
+  }
+  function sea(list) {
+    if (SEA) return SEA;
+    var byKey = {}; list.forEach(function (p) { if (p.key) byKey[p.key] = p; });
+    SEA = C.seadist.create(MeikoData.distances, function (a, b) {
+      var A = byKey[a] && byKey[a].port, B = byKey[b] && byKey[b].port;
+      return A && B ? C.geo.haversine(A.lat, A.lon, B.lat, B.lon) / 1852 : null;
+    });
+    SEA.byKey = byKey;
+    return SEA;
+  }
   reg({
     id: 'ports', cat: 'navigation', order: 3, icon: 'i-anchor', title: 'Port-to-Port',
-    desc: 'Straight-line distance and bearings between ports', keywords: 'harbour harbor pelabuhan priok perak belawan makassar',
-    lead: 'Choose a departure and destination port from the sample Indonesian port list.',
+    desc: 'Sea distance from the port distance tables, plus straight-line distance and bearings', keywords: 'harbour harbor pelabuhan tabel jarak distance table wilbar wiltim priok perak belawan makassar ambon sorong',
+    lead: 'Choose a departure and destination port. Sea distances come from the TNI AL port distance tables (western and eastern regions); the straight-line distance and bearings are computed from approximate port positions.',
     render: function (view) {
-      var all = MeikoData.ports.all();
+      var all = placeList(), S2 = sea(all);
+      function find(v) { for (var i = 0; i < all.length; i++) if (all[i].value === v) return all[i]; return null; }
       function portSelect(name, label) {
         return '<label class="field"><span>' + label + '</span><select name="' + name + '"><option value="">Select a port…</option>' +
-          all.map(function (p) { return '<option value="' + p.id + '">' + esc(p.name) + ' — ' + esc(p.city) + '</option>'; }).join('') + '</select></label>';
+          all.map(function (p) { return '<option value="' + esc(p.value) + '">' + esc(p.name) + (p.city && p.city !== '—' ? ' — ' + esc(p.city) : '') + (p.key ? '' : ' (no table)') + '</option>'; }).join('') + '</select></label>';
       }
       view.innerHTML = layout(this,
-        ui.notice('warn', '<b>Sample data, unverified.</b> Port coordinates are approximate harbour positions and have not yet been checked against official charts or port authority data. Do not treat them as authoritative.') +
-        '<div class="search" style="margin:0">' + icon('i-search') + '<input type="search" placeholder="Filter ports (name, city)…" data-filter data-no-persist></div>' +
+        ui.notice('warn', '<b>Check before use.</b> Sea distances are copied exactly from the distance tables you supplied, including any errors in them; MEIKO flags figures that look wrong. Port coordinates are approximate and unverified.') +
+        '<div class="search" style="margin:0">' + icon('i-search') + '<input type="search" placeholder="Search port (name, city, code e.g. AMB)…" data-filter data-no-persist></div>' +
         portSelect('from', 'Departure port') + portSelect('to', 'Destination port') +
         actions('Calculate', '<button class="btn btn-ghost" type="button" data-swap>' + icon('i-swap') + 'Swap</button>'),
-        ui.empty('i-anchor', 'Choose two ports', 'Results show great circle distance and bearings.'),
-        ui.help('Why this is not the sailing distance',
-          '<p>The figure is the great circle (shortest) distance between two points. Actual voyages follow routes that avoid land, shallow water, restricted areas and traffic separation schemes, and are usually longer.</p>' +
-          '<p>Real passage planning requires official nautical charts, Sailing Directions / pilot books, notices to mariners and the master\'s judgement.</p>' +
-          '<p><b>Adding ports:</b> the database lives in <code>js/data/ports-data.js</code>. Each record has name, city, country, latitude, longitude, <code>verified</code> and <code>source</code>.</p>') +
+        ui.empty('i-anchor', 'Choose two ports', 'Results show the table sea distance, straight-line distance and bearings.'),
+        ui.help('Where the figures come from',
+          '<p><b>Sea distance</b> is read from two tables: <i>Tabel Jarak Pangkalan TNI AL WILBAR</i> (22 western ports) and the eastern-region <i>Tabel Jarak</i> WILTIM (38 ports). In those tables each pair appears twice (row → column and back). Where the two figures differ, MEIKO shows both. Where a figure is shorter than the straight line between the ports — impossible for a sea route — it is marked as doubtful.</p>' +
+          '<p>If no table lists the pair, MEIKO adds up table legs through other ports (shortest chain). That is an <b>estimate</b>, usually longer than a direct route.</p>' +
+          '<p><b>Straight-line distance</b> is the great circle between approximate harbour positions. Actual voyages follow routes that avoid land, shallows, restricted areas and traffic separation schemes. Plan passages with official charts and sailing directions.</p>' +
+          '<p>Some table codes could not be identified with certainty (P. Gundul, BLP, MAS, and NATUNA in the eastern table); they are listed under their table names.</p>') +
         ui.disclaimer());
       var form = ui.$('form', view), out = ui.$('[data-out]', view);
       var from = ui.$('[name=from]', form), to = ui.$('[name=to]', form), filter = ui.$('[data-filter]', form);
       var store = ui.persist(form, 'ports');
       filter.addEventListener('input', function () {
-        var ids = MeikoData.ports.search(filter.value).map(function (p) { return p.id; });
+        var q = filter.value.trim().toLowerCase();
         [from, to].forEach(function (sel) {
-          ui.$$('option', sel).forEach(function (o) { if (o.value) o.hidden = ids.indexOf(o.value) === -1; });
+          ui.$$('option', sel).forEach(function (o) { if (!o.value) return; var p = find(o.value); o.hidden = !!q && p.hay.indexOf(q) === -1; });
         });
+        if (q) [from, to].forEach(function (sel) { var vis = ui.$$('option', sel).filter(function (o) { return o.value && !o.hidden; }); if (vis.length === 1 && !sel.value) { sel.value = vis[0].value; form.dispatchEvent(new Event('change')); } });
       });
       function badge(p) { return p.verified ? '<span class="badge ok">verified</span>' : '<span class="badge warn">unverified</span>'; }
+      function nm(v) { return ui.num(v, 0) + ' <small>NM</small>'; }
       function calc(silent) {
-        var A = MeikoData.ports.byId(from.value), B = MeikoData.ports.byId(to.value);
+        var A = find(from.value), B = find(to.value);
         if (!A || !B) { if (!silent) ui.showError(out, 'Select both a departure and a destination port.'); return; }
-        if (A.id === B.id) { if (!silent) ui.showError(out, 'Departure and destination are the same port.'); return; }
-        var r = C.geo.greatCircle(A.lat, A.lon, B.lat, B.lon), pd = primaryDist(r.distanceM);
-        var html = ui.resultCard(A.name + ' → ' + B.name,
-          ui.big('Straight-line distance', pd.v, pd.u, pd.alt) +
-          ui.kv([
-            ['Distance', ui.num(r.distanceNM, 1) + ' <small>NM</small>'],
-            ['Distance', ui.num(r.distanceKm, 1) + ' <small>km</small>'],
-            ['Initial bearing', ui.bearing(r.initialBearing) + ' <small>T · ' + C.geo.compassPoint(r.initialBearing) + '</small>'],
-            ['Final bearing', ui.bearing(r.finalBearing) + ' <small>T</small>'],
-            ['From ' + esc(A.name) + ' ' + badge(A), '<small>' + esc(ui.coordPair(A.lat, A.lon)) + '</small>'],
-            ['To ' + esc(B.name) + ' ' + badge(B), '<small>' + esc(ui.coordPair(B.lat, B.lon)) + '</small>']
-          ]), { copy: true, icon: 'i-anchor', badge: '<span class="badge warn">sample data</span>', foot: GC_NOTE + ' Actual routes require nautical charts, navigational restrictions and route planning.' });
-        ui.showResult(out, html, 'MEIKO · Port to port (sample, unverified coordinates)\n' + A.name + ' → ' + B.name +
-          '\nStraight-line distance: ' + ui.num(r.distanceNM, 1) + ' NM / ' + ui.num(r.distanceKm, 1) + ' km' +
-          '\nInitial bearing: ' + ui.bearing(r.initialBearing) + ' T\nFinal bearing: ' + ui.bearing(r.finalBearing) + ' T\nNot a navigable route distance.');
+        if (A.value === B.value) { if (!silent) ui.showError(out, 'Departure and destination are the same port.'); return; }
+        var gc = A.port && B.port ? C.geo.greatCircle(A.port.lat, A.port.lon, B.port.lat, B.port.lon) : null;
+        var body = '', copy = 'MEIKO · Port to port\n' + A.name + ' → ' + B.name, warn = [];
+        var entries = A.key && B.key ? S2.pair(A.key, B.key) : [];
+        if (entries.length) {
+          var good = []; entries.forEach(function (e) { if (e.ab != null && e.okAB) good.push(e.ab); if (e.ba != null && e.okBA) good.push(e.ba); });
+          var e0 = entries[0], main = e0.ab != null && e0.okAB ? e0.ab : (e0.ba != null && e0.okBA ? e0.ba : (good.length ? good[0] : null));
+          if (main != null) body += ui.big('Sea distance (distance table)', ui.num(main, 0), 'NM', ui.num(main * 1.852, 0) + ' km');
+          else {
+            var rr = S2.route(A.key, B.key);
+            if (rr) {
+              body += ui.big('Sea distance (estimate via table legs)', ui.num(rr.nm, 0), 'NM', 'the table figure for this pair looks wrong');
+              warn.push('Estimate via ' + rr.path.map(function (k) { return S2.byKey[k].name; }).join(' → ') + ' (' + rr.legs.join(' + ') + ' NM).');
+            } else body += ui.big('Sea distance (distance table)', '—', '', 'the table figure for this pair looks wrong');
+          }
+          var rows = [];
+          entries.forEach(function (e) {
+            var short = e.table === 'wilbar' ? 'WILBAR table' : 'WILTIM table';
+            if (e.agree) rows.push([short + ' <small>(' + esc(e.codeA) + '–' + esc(e.codeB) + ')</small>', nm(e.ab) + (e.okAB ? '' : ' <span class="badge warn">doubtful</span>')]);
+            else {
+              rows.push([short + ' · row ' + esc(e.codeA) + ' → ' + esc(e.codeB), nm(e.ab) + (e.okAB ? '' : ' <span class="badge warn">doubtful</span>')]);
+              rows.push([short + ' · row ' + esc(e.codeB) + ' → ' + esc(e.codeA), nm(e.ba) + (e.okBA ? '' : ' <span class="badge warn">doubtful</span>')]);
+              warn.push('The ' + short + ' gives two different figures for this pair (' + e.ab + ' and ' + e.ba + ' NM). Check the original table.');
+            }
+            if (!e.okAB || (!e.agree && !e.okBA)) warn.push('A figure in the ' + short + ' is shorter than the straight-line distance (' + (gc ? ui.num(gc.distanceNM, 0) : '?') + ' NM), so it is probably a typing error in the table.');
+            copy += '\n' + short + ': ' + (e.agree ? e.ab : e.ab + ' / ' + e.ba) + ' NM';
+          });
+          if (entries.length > 1 && entries[0].ab !== entries[1].ab) warn.push('The two tables give different figures; the first one shown is from the ' + (entries[0].table === 'wilbar' ? 'western' : 'eastern') + ' table.');
+          body += ui.kv(rows);
+        } else if (A.key && B.key) {
+          var r = S2.route(A.key, B.key);
+          if (r) {
+            body += ui.big('Sea distance (estimate via table legs)', ui.num(r.nm, 0), 'NM', 'not listed directly in the tables');
+            body += ui.kv(r.legs.map(function (v, i) { return [esc(S2.byKey[r.path[i]].name) + ' → ' + esc(S2.byKey[r.path[i + 1]].name), nm(v)]; }));
+            warn.push('No table lists this pair, so the distance is the sum of table legs through ' + r.path.slice(1, -1).map(function (k) { return S2.byKey[k].name; }).join(', ') + '. Treat it as a rough upper estimate.');
+            copy += '\nEstimated sea distance via ' + r.path.map(function (k) { return S2.byKey[k].name; }).join(' → ') + ': ' + Math.round(r.nm) + ' NM (estimate)';
+          }
+        } else {
+          body += '<div class="card-pad">' + ui.notice('', (A.key ? esc(B.name) : esc(A.name)) + ' is not in the distance tables, so only the straight-line distance is available.', 'i-info') + '</div>';
+        }
+        if (gc) {
+          var pd = primaryDist(gc.distanceM);
+          if (!body) body += ui.big('Straight-line distance', pd.v, pd.u, pd.alt);
+          body += ui.kv([
+            ['Straight-line distance', ui.num(gc.distanceNM, 1) + ' <small>NM</small> · ' + ui.num(gc.distanceKm, 0) + ' <small>km</small>'],
+            ['Initial bearing', ui.bearing(gc.initialBearing) + ' <small>T · ' + C.geo.compassPoint(gc.initialBearing) + '</small>'],
+            ['Final bearing', ui.bearing(gc.finalBearing) + ' <small>T</small>'],
+            ['From ' + esc(A.name) + ' ' + badge(A.port), '<small>' + esc(ui.coordPair(A.port.lat, A.port.lon)) + '</small>'],
+            ['To ' + esc(B.name) + ' ' + badge(B.port), '<small>' + esc(ui.coordPair(B.port.lat, B.port.lon)) + '</small>']
+          ]);
+          copy += '\nStraight line: ' + ui.num(gc.distanceNM, 1) + ' NM, initial bearing ' + ui.bearing(gc.initialBearing) + ' T (not a navigable route)';
+        } else body += '<div class="card-pad">' + ui.notice('', 'No position is stored for ' + esc(!A.port ? A.name : B.name) + ', so the straight-line distance and bearings are not shown.', 'i-info') + '</div>';
+        [A, B].forEach(function (p) { if (p.note) warn.push(esc(p.name) + ': ' + esc(p.note)); });
+        if (warn.length) body += '<div class="card-pad">' + ui.notice('warn', warn.join('<br>'), 'i-alert') + '</div>';
+        if (A.key) {
+          var nb = S2.neighbours(A.key);
+          body += '<details class="help nb-list" style="margin:0 14px 14px"><summary>' + icon('i-anchor') + 'All table distances from ' + esc(A.name) + ' (' + nb.length + ')</summary><div class="card-pad">' +
+            ui.kv(nb.map(function (n) { return [esc(S2.byKey[n.key].name), nm(n.nm)]; })) + '</div></details>';
+        }
+        ui.showResult(out, ui.resultCard(A.name + ' → ' + B.name, body, { copy: true, icon: 'i-anchor', badge: entries.length ? '<span class="badge info">distance table</span>' : '<span class="badge warn">estimate</span>', foot: 'Sea distances as printed in the TNI AL distance tables (not independently verified). ' + GC_NOTE }), copy);
       }
       form.addEventListener('change', function () { calc(true); });
       form.addEventListener('submit', function (e) { e.preventDefault(); calc(false); });
       ui.$('[data-swap]', form).addEventListener('click', function () { var t = from.value; from.value = to.value; to.value = t; form.dispatchEvent(new Event('change')); });
-      ui.$('[data-reset]', form).addEventListener('click', function () { from.value = ''; to.value = ''; filter.value = ''; filter.dispatchEvent(new Event('input')); store.clear(); out.innerHTML = ui.empty('i-anchor', 'Choose two ports', 'Results show great circle distance and bearings.'); });
+      ui.$('[data-reset]', form).addEventListener('click', function () { from.value = ''; to.value = ''; filter.value = ''; filter.dispatchEvent(new Event('input')); store.clear(); out.innerHTML = ui.empty('i-anchor', 'Choose two ports', 'Results show the table sea distance, straight-line distance and bearings.'); });
       calc(true);
     }
   });

@@ -4,12 +4,12 @@
  * cache-first with a background refresh ("stale-while-revalidate") for same-origin GET requests.
  * Bump CACHE_VERSION whenever any file changes so clients pick up the new version.
  */
-var CACHE_VERSION = 'meiko-v1.7.0';
+var CACHE_VERSION = 'meiko-v1.8.0';
 var ASSETS = [
   './', 'index.html', 'manifest.json', 'css/style.css',
   'assets/icons/icon.svg', 'assets/icons/icon-192.png', 'assets/icons/icon-512.png', 'assets/icons/icon-maskable-512.png', 'assets/icons/apple-touch-icon.png',
-  'js/core/geo.js', 'js/core/coords.js', 'js/core/units.js', 'js/core/navcalc.js', 'js/core/solar.js', 'js/core/prayer.js', 'js/core/qibla.js', 'js/core/calc.js', 'js/core/nmea.js', 'js/core/track.js', 'js/core/wmm.js', 'js/core/livenav.js', 'js/core/celestial.js', 'js/core/platesolve.js',
-  'js/data/ports-data.js', 'js/data/stars-data.js',
+  'js/core/geo.js', 'js/core/coords.js', 'js/core/units.js', 'js/core/navcalc.js', 'js/core/solar.js', 'js/core/prayer.js', 'js/core/qibla.js', 'js/core/calc.js', 'js/core/nmea.js', 'js/core/track.js', 'js/core/wmm.js', 'js/core/livenav.js', 'js/core/celestial.js', 'js/core/platesolve.js', 'js/core/seadist.js',
+  'js/data/ports-data.js', 'js/data/stars-data.js', 'js/data/distance-tables.js',
   'js/i18n.js', 'js/storage.js', 'js/settings.js', 'js/features.js', 'js/ui.js', 'js/gps.js',
   'js/modules/navigation.js', 'js/modules/calculator.js', 'js/modules/converter.js', 'js/modules/astronomy.js',
   'js/modules/prayer.js', 'js/modules/qibla.js', 'js/modules/position.js', 'js/modules/settings.js', 'js/modules/vessel.js', 'js/modules/track.js', 'js/modules/livenav.js', 'js/modules/stars.js', 'js/modules/map.js',

@@ -498,5 +498,31 @@ test('Star catalogue: 58 navigational stars present (57 + Polaris)', function ()
   assert.strictEqual(Object.keys(starsData.NAV).length, 58); assert.ok(Object.keys(starsData.CONS).length === 88);
 });
 
+/* ---------- Port distance tables ---------- */
+var distT = require(path.join(__dirname, '..', 'js', 'data', 'distance-tables.js')), seadist = core('seadist');
+test('Distance tables: square matrices, empty diagonal, every key has a place entry', function () {
+  distT.TABLES.forEach(function (t) {
+    assert.strictEqual(t.rows.length, t.keys.length); assert.strictEqual(t.codes.length, t.keys.length);
+    t.rows.forEach(function (r, i) { assert.strictEqual(r.length, t.keys.length); assert.strictEqual(r[i], null); });
+    t.keys.forEach(function (k) { assert.ok(distT.PLACES[k], k); var pid = distT.PLACES[k].port; if (pid) assert.ok(ports.byId(pid), pid); });
+  });
+});
+test('Distance tables: spot checks against the PDFs', function () {
+  var S = seadist.create(distT);
+  var w = function (a, b) { return S.pair(a, b).filter(function (e) { return e.table === 'wilbar'; })[0]; }, t = function (a, b) { return S.pair(a, b).filter(function (e) { return e.table === 'wiltim'; })[0]; };
+  assert.strictEqual(w('tpriok', 'lampung').ab, 168); assert.strictEqual(w('malahayati', 'tpriok').ab, 1148); assert.strictEqual(w('tpriok', 'malahayati').ab, 1144);
+  assert.strictEqual(w('panjang', 'tratai').ab, 18); assert.strictEqual(w('dumai', 'panjang').ab, 1592);
+  assert.strictEqual(t('surabaya', 'banjarmasin').ab, 250); assert.strictEqual(t('tpinang', 'tguban').ab, 12);
+  assert.strictEqual(t('dili', 'kendari').ab, 3451); assert.strictEqual(t('kendari', 'dili').ab, 3451); assert.strictEqual(t('kendari', 'ambon').ab, 345);
+  assert.strictEqual(t('jayapura', 'biak').ab, 315); assert.strictEqual(t('makassar', 'balikpapan').ab, 325);
+});
+test('Sea distance: implausible figure flagged, route estimate through table legs', function () {
+  var co = {}; ports.all().forEach(function (p) { co[p.id] = p; });
+  var S = seadist.create(distT, function (a, b) { var A = co[distT.PLACES[a].port], B = co[distT.PLACES[b].port]; return A && B ? geo.haversine(A.lat, A.lon, B.lat, B.lon) / 1852 : null; });
+  var e = S.pair('tpriok', 'ambon')[0]; assert.strictEqual(e.ab, 353); assert.ok(!e.okAB, 'TPK–AMB 353 NM < straight line');
+  var r = S.route('dumai', 'jayapura'); assert.ok(r && r.path.length >= 3 && r.nm > 2000, JSON.stringify(r));
+  assert.ok(S.neighbours('surabaya').length >= 37);
+});
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed\n');
 process.exit(failed ? 1 : 0);
