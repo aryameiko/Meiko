@@ -47,7 +47,8 @@
     opts = opts || {};
     var L = ctl.L, map = ctl.map;
     var sm = C.livenav.smoother({ tau: 5 });
-    var live = false, follow = true, lastFix = null, st = null, err = null, layer = null, wake = null, lastArrive = 0;
+    var live = false, follow = true, lastFix = null, st = null, err = null, layer = null, wake = null, lastArrive = 0, gw = null;
+    function gpsOff() { if (gw) MEIKO.gps.stop(gw); gw = null; }
 
     function requestWake() {
       try { if (navigator.wakeLock && navigator.wakeLock.request) navigator.wakeLock.request('screen').then(function (w) { wake = w; }, function () {}); } catch (e) {}
@@ -58,15 +59,16 @@
 
     function start() {
       err = null; live = true; sessionLive = true; follow = true; sm.reset();
-      MEIKO.gps.watch(onFix, function (e) {
+      gpsOff();
+      gw = MEIKO.gps.watch(onFix, function (e) {
         err = e.message;
         // Signal loss / timeout: keep watching (the browser keeps trying). Permission or setup problems: stop.
-        if (e.code !== 2 && e.code !== 3) { live = false; sessionLive = false; MEIKO.gps.stop(); releaseWake(); }
+        if (e.code !== 2 && e.code !== 3) { live = false; sessionLive = false; gpsOff(); releaseWake(); }
         render();
       });
       requestWake(); render();
     }
-    function stop() { live = false; sessionLive = false; MEIKO.gps.stop(); releaseWake(); render(); draw(); }
+    function stop() { live = false; sessionLive = false; gpsOff(); releaseWake(); render(); draw(); }
 
     function onFix(f) {
       if (!live) return;
@@ -105,8 +107,9 @@
       if (lastFix && live) L.polyline([[lastFix.lat, lastFix.lon], [pts[n.idx].lat, pts[n.idx].lon]], { className: 'nav-goto', weight: 2, interactive: false }).addTo(layer);
     }
 
+    var actKey = null;
     function render() {
-      var n = getNav(), h = '';
+      var n = getNav(), h = '', a = '';
       h += '<div class="ln-head"><span class="ln-dot' + (live ? ' on' : '') + '"></span><b>Live navigation</b>' +
         (live && lastFix ? '<span class="small muted">' + esc(lastFix.sourceLabel || 'GPS') + (lastFix.accuracy != null ? ' · ±' + Math.round(lastFix.accuracy) + ' m' : '') + '</span>' : '') +
         '<span class="spacer"></span>' +
@@ -139,18 +142,25 @@
             cell('To end', esc(dist(r.toEndNM)), r.speedSource === 'planned' ? 'at planned ' + kn(r.speedKn) + ' kn' : r.speedSource === 'sog' ? 'at SOG' : 'set a planned speed') +
             '</div>';
         } else if (!live) h += '<p class="small muted">Start GPS to see bearing, distance and ETA to ' + esc(wpName(n, n.idx)) + '.</p>';
-        h += '<div class="flex ln-actions"><label class="small">Planned speed <input data-ln-plan inputmode="decimal" value="' + esc(n.plannedKn || '') + '" placeholder="kn"></label>' +
+        a = '<div class="flex ln-actions"><label class="small">Planned speed <input data-ln-plan inputmode="decimal" value="' + esc(n.plannedKn || '') + '" placeholder="kn"></label>' +
           '<label class="small">Arrival radius <select data-ln-arr>' + [[0.02, '0.02 NM (37 m)'], [0.05, '0.05 NM (93 m)'], [0.1, '0.1 NM'], [0.25, '0.25 NM'], [0.5, '0.5 NM']].map(function (o) { return '<option value="' + o[0] + '"' + ((n.arrivalNM || 0.05) === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></label>' +
           '<span class="spacer"></span><button class="btn btn-ghost btn-sm" data-ln-end>' + icon('i-x') + 'End route</button></div>';
       } else {
-        h += '<div class="flex ln-actions"><span class="small muted">Not following a track.</span><span class="spacer"></span><button class="btn btn-ghost btn-sm" data-ln-pick>' + icon('i-route') + 'Follow a track</button></div>';
+        a = '<div class="flex ln-actions"><span class="small muted">Not following a track.</span><span class="spacer"></span><button class="btn btn-ghost btn-sm" data-ln-pick>' + icon('i-route') + 'Follow a track</button></div>';
       }
-      h += '<p class="ln-note small muted">COG/SOG are smoothed over a few seconds. ' + esc(ui.NAV_DISCLAIMER) + '</p>';
-      el.innerHTML = h;
-      bind(n);
+      // The live part is redrawn on every GPS fix. The planned speed / arrival radius controls are redrawn only
+      // when they change and never while the user is editing them (otherwise typing is wiped about once a second).
+      if (!el.querySelector('[data-ln-dyn]')) {
+        el.innerHTML = '<div data-ln-dyn></div><div data-ln-act></div><p class="ln-note small muted">COG/SOG are smoothed over a few seconds. ' + esc(ui.NAV_DISCLAIMER) + '</p>';
+        actKey = null;
+      }
+      ui.$('[data-ln-dyn]', el).innerHTML = h;
+      bind(n, ui.$('[data-ln-dyn]', el));
+      var actEl = ui.$('[data-ln-act]', el), busy = actEl.contains(document.activeElement);
+      if (a !== actKey && !busy) { actEl.innerHTML = a; actKey = a; bind(n, actEl); }
     }
-    function bind(n) {
-      var $ = function (s) { return ui.$(s, el); };
+    function bind(n, root) {
+      var $ = function (s) { return ui.$(s, root); };
       var b;
       if ((b = $('[data-ln-start]'))) b.addEventListener('click', start);
       if ((b = $('[data-ln-stop]'))) b.addEventListener('click', stop);
@@ -160,8 +170,8 @@
       if ((b = $('[data-ln-prev]'))) b.addEventListener('click', function () { delete n.auto; n.idx = Math.max(0, n.idx - 1); n.done = false; setNav(n); render(); draw(); });
       if ((b = $('[data-ln-next]'))) b.addEventListener('click', function () { delete n.auto; n.idx = Math.min(n.points.length - 1, n.idx + 1); n.done = false; setNav(n); render(); draw(); });
       if ((b = $('[data-ln-end]'))) b.addEventListener('click', function () { setNav(null); render(); draw(); ui.toast('Route ended'); });
-      if ((b = $('[data-ln-plan]'))) b.addEventListener('change', function (e) { var v = parseFloat(e.target.value.replace(',', '.')); n.plannedKn = isFinite(v) && v > 0 ? v : null; setNav(n); render(); });
-      if ((b = $('[data-ln-arr]'))) b.addEventListener('change', function (e) { n.arrivalNM = +e.target.value; setNav(n); });
+      if ((b = $('[data-ln-plan]'))) b.addEventListener('change', function (e) { var c = getNav(); if (!c) return; var v = parseFloat(e.target.value.replace(',', '.')); c.plannedKn = isFinite(v) && v > 0 ? v : null; setNav(c); e.target.blur(); render(); });
+      if ((b = $('[data-ln-arr]'))) b.addEventListener('change', function (e) { var c = getNav(); if (!c) return; c.arrivalNM = +e.target.value; setNav(c); e.target.blur(); render(); });
     }
 
     function pickTrack() {
@@ -198,7 +208,7 @@
 
     var api = {
       startRoute: startRoute,
-      destroy: function () { document.removeEventListener('visibilitychange', onVis); if (live) { MEIKO.gps.stop(); releaseWake(); } live = false; if (current === api) current = null; }
+      destroy: function () { document.removeEventListener('visibilitychange', onVis); if (live) releaseWake(); gpsOff(); live = false; if (current === api) current = null; }
     };
     current = api;
     return api;

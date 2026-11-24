@@ -63,8 +63,9 @@
   function ensureGps() {
     if (!MEIKO.gps) return;
     var l = MEIKO.gps.last && MEIKO.gps.last(); if (l) onFix(l);
-    if (!MEIKO.gps.isWatching()) MEIKO.gps.watch(function () {}, function (e) { ui.toast(e.message); });
+    if (!st.gw) st.gw = MEIKO.gps.watch(function () {}, function (e) { ui.toast(e.message); if (e.code !== 2 && e.code !== 3) gpsOff(); });
   }
+  function gpsOff() { if (st.gw) MEIKO.gps.stop(st.gw); st.gw = null; }
   function chatKey() { return 'fleet:chat:' + st.tag; }
   function addChat(m) {
     if (st.chat.some(function (x) { return x.id === m.id; })) return false;
@@ -199,11 +200,12 @@
     if (st.client) { try { st.client.sendLive({ k: 'bye', name: me().name }); } catch (e) {} var c = st.client; setTimeout(function () { c.stop(); }, 400); }
     st.client = null; st.tag = null; st.peers = {}; st.chat = []; st.dm = {}; st.dmName = {}; st.unread = {}; st.view = 'group'; st.status = { relays: 0, connected: 0 };
     if (MEIKO.gps && MEIKO.gps.offFix) MEIKO.gps.offFix(onFix);
+    gpsOff();
     if (!silent) { saveCfg({ joined: false }); emit('all'); }
   }
   function setShare(on) {
     saveCfg({ share: !!on });
-    if (on) ensureGps();
+    if (on) ensureGps(); else gpsOff(); // stop the GPS again when sharing is switched off (saves battery)
     beat(); emit('status');
   }
   function sendChat(text) {

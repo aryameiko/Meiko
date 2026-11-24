@@ -105,10 +105,12 @@
         MEIKO.gps.getPosition({ maximumAge: 0 }).then(function (f) { setStatus('', ''); renderFix(f); }, function (err) { setStatus('err', ui.esc(err.message)); })
           .then(function () { getBtn.disabled = false; });
       });
+      var gw = null;
+      function gpsOff() { if (gw) MEIKO.gps.stop(gw); gw = null; }
       watchBtn.addEventListener('click', function () {
-        if (MEIKO.gps.isWatching()) { MEIKO.gps.stop(); watchBtn.classList.remove('btn-gold'); watchBtn.innerHTML = icon('i-route') + 'Track'; setStatus('', ''); return; }
+        if (gw) { gpsOff(); watchBtn.classList.remove('btn-gold'); watchBtn.innerHTML = icon('i-route') + 'Track'; setStatus('', ''); return; }
         watchBtn.classList.add('btn-gold'); watchBtn.innerHTML = icon('i-x') + 'Stop'; setStatus('', 'Tracking — position updates continuously.');
-        MEIKO.gps.watch(function (f) { renderFix(f); }, function (err) { setStatus('err', ui.esc(err.message)); MEIKO.gps.stop(); watchBtn.classList.remove('btn-gold'); watchBtn.innerHTML = icon('i-route') + 'Track'; });
+        gw = MEIKO.gps.watch(function (f) { renderFix(f); }, function (err) { setStatus('err', ui.esc(err.message)); gpsOff(); watchBtn.classList.remove('btn-gold'); watchBtn.innerHTML = icon('i-route') + 'Track'; });
       });
       /* ---- GPS source & external receiver ---- */
       var X = MEIKO.gps.external, sup = X.support();
@@ -148,7 +150,7 @@
         }
         extStatus.innerHTML = html;
         if (ui.$('[data-monitor]', view).open) logEl.textContent = st.log.length ? st.log.map(function (l) { return (l.ok ? '✓ ' : '✗ ') + l.line + (l.ok ? '' : '   ← ' + l.err); }).join('\n') : 'No data yet.';
-        if (st.fix && (MEIKO.settings.get('gpsSource') || 'auto') !== 'device' && !MEIKO.gps.isWatching()) renderFix(st.fix);
+        if (st.fix && (MEIKO.settings.get('gpsSource') || 'auto') !== 'device' && !gw) renderFix(st.fix);
       }
       function busy(btn, p) {
         ui.$('[data-ext-err]', view).innerHTML = '';
@@ -169,7 +171,7 @@
       renderFix(last);
       if (last) setStatus('', 'Showing your last fix from ' + ui.date(last.timestamp) + ' ' + ui.time(last.timestamp) + '. Tap “Get current position” to refresh.');
       renderSaved();
-      return function () { MEIKO.gps.stop(); offStatus(); };
+      return function () { gpsOff(); offStatus(); };
     }
   });
 })();

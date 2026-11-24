@@ -4,8 +4,8 @@
  * Kaaba position (approximate, as specified for MEIKO): 21.4225° N, 39.8262° E.
  *
  * A phone compass measures MAGNETIC heading. Magnetic bearing = true bearing − magnetic variation
- * (variation east positive). MEIKO does not ship a geomagnetic model, so the user may enter the
- * variation from a chart; otherwise the bearing shown is TRUE.
+ * (variation east positive). The Qibla page takes it from the bundled WMM2025 model (js/core/wmm.js) unless the user enters the
+ * variation from a chart. The main bearing shown is always TRUE.
  */
 (function (root, factory) {
   var geo = (typeof module === 'object' && module.exports) ? require('./geo.js') : root.MeikoCore.geo;

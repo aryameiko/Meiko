@@ -24,8 +24,7 @@
   var NMEA = window.MeikoCore.nmea;
   var last = MEIKO.storage.get('lastFix', null);
   var listeners = [];
-  var watchId = null, extWatch = null;
-  var FRESH_MS = 10000;
+    var FRESH_MS = 10000;
 
   function pref() { return MEIKO.settings.get('gpsSource') || 'auto'; }
 
@@ -108,7 +107,7 @@
   }
   function setDisconnected(err) {
     ext.connected = false; ext.error = err || null;
-    if (extWatch) { var w = extWatch; stop(); w.onErr(new Error(err || 'External GPS disconnected.')); }
+    if (under && under.kind === 'external') { var e = new Error(err || 'External GPS disconnected.'), ws = watchers.slice(); watchers = []; stopUnder(); ws.forEach(function (w) { try { if (w.onErr) w.onErr(e); } catch (x) {} }); }
     emitStatus();
   }
   function support() {
@@ -292,23 +291,46 @@
     if (p === 'auto' && ext.connected) return waitForExternalFix(4000).catch(function () { return deviceGet(opts); });
     return deviceGet(opts);
   }
-  function watch(onFix, onErr) {
-    stop();
+  /*
+   * Watching is shared: several tools may watch at the same time (e.g. Fleet position sharing in the background
+   * while the map's live navigation runs). watch() returns a handle; stop(handle) ends only that watcher, and the
+   * GPS itself is switched off when the last watcher stops. stop() without a handle ends every watcher.
+   */
+  var watchers = [], under = null; // under = the running source: { kind: 'device', id } | { kind: 'external', fn }
+  function deliver(f) { watchers.slice().forEach(function (w) { try { w.onFix(f); } catch (e) {} }); }
+  function failAll(e) { watchers.slice().forEach(function (w) { try { if (w.onErr) w.onErr(e); } catch (x) {} }); }
+  function startUnder() {
     var p = pref();
     if (p === 'external' || (p === 'auto' && ext.connected)) {
-      if (!ext.connected) { onErr(new Error('The external GPS is not connected. Connect it below, or switch the GPS source to Auto or Phone.')); return; }
-      var fn = function (f) { if (f.source === 'external') onFix(f); };
-      listeners.push(fn); extWatch = { fn: fn, onErr: onErr };
-      var f0 = extFix(); if (f0) onFix(f0);
-      return;
+      if (!ext.connected) return new Error('The external GPS is not connected. Connect it below, or switch the GPS source to Auto or Phone.');
+      var fn = function (f) { if (f.source === 'external') deliver(f); };
+      listeners.push(fn); under = { kind: 'external', fn: fn };
+      return null;
     }
-    if (!window.isSecureContext || !('geolocation' in navigator)) { onErr(explain()); return; }
-    watchId = navigator.geolocation.watchPosition(function (pos) { var f = toFix(pos); store(f); onFix(f); },
-      function (err) { onErr(explain(err)); }, { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 });
+    if (!window.isSecureContext || !('geolocation' in navigator)) return explain();
+    under = { kind: 'device', id: navigator.geolocation.watchPosition(function (pos) { var f = toFix(pos); store(f); deliver(f); },
+      function (err) { failAll(explain(err)); }, { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 }) };
+    return null;
   }
-  function stop() {
-    if (watchId != null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
-    if (extWatch) { var fn = extWatch.fn; listeners = listeners.filter(function (x) { return x !== fn; }); extWatch = null; }
+  function stopUnder() {
+    if (!under) return;
+    if (under.kind === 'device') navigator.geolocation.clearWatch(under.id);
+    else { var fn = under.fn; listeners = listeners.filter(function (x) { return x !== fn; }); }
+    under = null;
+  }
+  function watch(onFix, onErr) {
+    var w = { onFix: onFix, onErr: onErr };
+    if (!under) { var err = startUnder(); if (err) { if (onErr) onErr(err); return null; } }
+    watchers.push(w);
+    // Give the new watcher the current position straight away if it is fresh.
+    var f0 = under.kind === 'external' ? extFix() : (last && last.source === 'device' && Date.now() - last.timestamp < 5000 ? last : null);
+    if (f0) { if (under.kind === 'external') onFix(f0); else setTimeout(function () { if (watchers.indexOf(w) !== -1) onFix(f0); }, 0); }
+    return w;
+  }
+  function stop(handle) {
+    if (handle) watchers = watchers.filter(function (x) { return x !== handle; });
+    else watchers = [];
+    if (!watchers.length) stopUnder();
   }
   function quality(acc) {
     if (acc == null) return { level: 'unknown', label: 'Accuracy unknown' };
@@ -319,7 +341,7 @@
 
   MEIKO.gps = {
     getPosition: getPosition, watch: watch, stop: stop, quality: quality,
-    last: function () { return last; }, isWatching: function () { return watchId != null || !!extWatch; },
+    last: function () { return last; }, isWatching: function (handle) { return handle ? watchers.indexOf(handle) !== -1 : watchers.length > 0; },
     onFix: function (fn) { listeners.push(fn); }, offFix: function (fn) { listeners = listeners.filter(function (x) { return x !== fn; }); },
     source: pref, platform: platform, permissionState: permissionState, requestPermission: requestPermission, watchPermission: watchPermission,
     external: {

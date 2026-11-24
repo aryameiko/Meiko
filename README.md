@@ -137,6 +137,13 @@ Star positions use GMST (IAU 1982) and precession (IAU 1976). Nutation, aberrati
 - **Limits.** Both sides need internet; public relays can be slow or down; phones pause web apps in the background. It is not a safety or distress system: use VHF/DSC and AIS. A commercial version with guaranteed delivery and history would need a proper backend (for example Firebase or Supabase under the owner's account).
 - **Code.** Protocol and crypto in `js/core/fleet.js` (tests in `tests/fleet-tests.js` with an in-memory relay), UI in `js/modules/fleet.js`, signing library bundled in `js/vendor/nostr-crypto.js` (@noble/curves + @noble/hashes, MIT).
 
+## Fixes (v1.9.3)
+
+- **GPS shared between tools.** Several tools can now watch the GPS at once. Before, pressing *Stop GPS* in live navigation, or leaving *My Position*, switched the GPS off for everyone, so Fleet & Chat position sharing silently stopped. Sharing off now also switches the GPS off again.
+- **Live navigation:** the *Planned speed* and *Arrival radius* fields no longer reset while you type (the panel was redrawn on every GPS fix).
+- **Qibla live compass:** if the variation field is empty, the magnetic Qibla uses the built-in World Magnetic Model 2025 (works offline). The permission message now covers Chrome as well as Safari.
+- **Map:** leaving the map while *Save visible area* was still downloading no longer causes an error.
+
 ## Course & Bearing map (v1.8.5)
 
 **Course & Bearing** has a map under the two positions. Tap the map to set A (departure) and then B (destination), or type the positions. The map shows the great circle (solid, with direction arrows), the rhumb line (dashed), the initial course at A and the final bearing at B. It works offline on the bundled outline map.

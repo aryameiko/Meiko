@@ -52,7 +52,7 @@
         '<div class="card card-pad form-gap"><button class="btn btn-primary" style="width:100%" type="button" data-locate>' + icon('i-gps') + 'Use my current location</button>' +
         '<div class="small muted" style="text-align:center">or enter coordinates manually</div>' +
         '<form class="form-gap" novalidate>' + ui.coordField('p', 'Your position', { noGps: true }) +
-        '<label class="field"><span>Magnetic variation (optional, ° — east positive, west negative)</span><input name="var" inputmode="decimal" placeholder="Unknown — leave empty"><small class="hint">From your chart\'s compass rose or a geomagnetic calculator. Used only for the live compass.</small></label>' +
+        '<label class="field"><span>Magnetic variation (optional, ° — east positive, west negative)</span><input name="var" inputmode="decimal" placeholder="Auto (WMM2025)"><small class="hint">Leave empty to use the World Magnetic Model 2025 (works offline), or enter the value from your chart\'s compass rose. Used only for the live compass.</small></label>' +
         '<div class="actions" style="margin-top:4px"><button class="btn btn-ghost" type="submit">' + icon('i-check') + 'Calculate</button><button class="btn btn-ghost" type="button" data-save>' + icon('i-star') + 'Save position</button><button class="btn btn-ghost" type="button" data-reset>' + icon('i-reset') + 'Reset</button></div></form></div>' +
         '</div>' +
         '<div class="results-col"><div class="result"><div class="result-head">' + icon('i-kaaba') + '<h3>Qibla direction</h3><span class="badge info" data-mode-badge>true north up</span></div>' +
@@ -64,7 +64,7 @@
         '<div style="padding:0 18px 16px" class="form-gap"><button class="btn btn-gold" style="width:100%" type="button" data-sensor>' + icon('i-nav') + 'Start live compass</button><div data-sensor-msg></div></div>' +
         '<div class="result-foot" data-foot>Bearing is relative to <b>true north</b>. A phone compass points to <b>magnetic north</b> and may differ by the local variation plus any sensor error.</div></div></div></div>' +
         ui.help('Compass calibration & accuracy', '<ul>' +
-          '<li><b>True vs magnetic:</b> the Qibla bearing shown is from true (geographic) north. A magnetic compass differs by the local magnetic variation. If you know it, enter it above.</li>' +
+          '<li><b>True vs magnetic:</b> the Qibla bearing shown is from true (geographic) north. A magnetic compass differs by the local magnetic variation. The live compass corrects for it with the World Magnetic Model 2025, or with the value you enter above.</li>' +
           '<li><b>Calibrate:</b> move the phone slowly in a figure-8 pattern several times, then hold it flat (screen up), away from your body.</li>' +
           '<li><b>Interference:</b> metal objects, magnets, phone cases with magnets, speakers, vehicles and especially <b>ship steel structures and electrical equipment</b> can deflect the sensor by many degrees. On board, prefer the ship\'s gyro/true heading: steer or face the true bearing shown.</li>' +
           '<li>MEIKO cannot tell whether your sensor is calibrated. Treat the live compass as approximate; the calculated bearing is the reliable figure.</li>' +
@@ -80,7 +80,14 @@
       var store = ui.persist(form, 'qibla');
       var current = null, heading = null, live = false, gotEvent = false, smooth = null, handler = null, evName = null, noSensorTimer = null;
 
-      function variation() { var v = Number(String(ui.$('[name=var]', form).value).replace(',', '.')); return isFinite(v) && Math.abs(v) <= 60 ? v : 0; }
+      /** Variation typed by the user, or (field empty) the World Magnetic Model value for the position. */
+      function variation() {
+        var raw = String(ui.$('[name=var]', form).value).trim().replace(',', '.');
+        if (raw !== '') { var v = Number(raw); return isFinite(v) && Math.abs(v) <= 60 ? v : 0; }
+        if (current && C.wmm) { try { var d = C.wmm.declination(current.lat, current.lon); return isFinite(d) ? Math.round(d * 10) / 10 : 0; } catch (e) {} }
+        return 0;
+      }
+      function varIsAuto() { return String(ui.$('[name=var]', form).value).trim() === '' && !!C.wmm; }
       function draw() {
         if (!current || current.atKaaba) { arrow.style.display = 'none'; return; }
         arrow.style.display = '';
@@ -109,7 +116,7 @@
         var v = variation();
         kvEl.innerHTML = ui.kv([
           ['Qibla (true)', ui.bearing(current.bearing) + ' <small>T</small>'],
-          v ? ['Qibla (magnetic, var ' + (v > 0 ? v + '° E' : Math.abs(v) + '° W') + ')', ui.bearing(C.qibla.trueToMagnetic(current.bearing, v)) + ' <small>M</small>'] : null,
+          v ? ['Qibla (magnetic, var ' + (v > 0 ? v + '° E' : Math.abs(v) + '° W') + (varIsAuto() ? ', WMM2025' : '') + ')', ui.bearing(C.qibla.trueToMagnetic(current.bearing, v)) + ' <small>M</small>'] : null,
           ['Distance to Kaaba', ui.num(current.distanceKm, 0) + ' <small>km · ' + ui.num(current.distanceNM, 0) + ' NM</small>'],
           ['Your position', '<small>' + ui.esc(ui.coordPair(c.lat, c.lon)) + '</small>']
         ]) + '<div style="padding:0 18px 12px"><button class="btn btn-ghost btn-sm" type="button" data-copy-q>' + icon('i-copy') + 'Copy</button></div>';
@@ -177,7 +184,7 @@
         if (typeof DeviceOrientationEvent.requestPermission === 'function') {
           DeviceOrientationEvent.requestPermission().then(function (state) {
             if (state === 'granted') startListening();
-            else sensorMsg.innerHTML = ui.notice('err', 'Motion & orientation permission was denied. Enable it in Safari settings to use the live compass.');
+            else sensorMsg.innerHTML = ui.notice('err', 'Compass (motion sensor) permission was denied. Allow it to use the live compass: on iPhone/iPad in Settings › Safari › Motion & Orientation Access, in Chrome under Site settings › Motion sensors.');
           }, function () { sensorMsg.innerHTML = ui.notice('err', 'Could not request compass permission.'); });
         } else startListening();
       });

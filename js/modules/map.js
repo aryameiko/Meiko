@@ -222,7 +222,7 @@
       },
       goTo: function (lat, lon, z) { map.setView([lat, lon], z || Math.max(map.getZoom(), 12)); },
       resize: function () { map.invalidateSize(); },
-      destroy: function () { alive = false; try { map.remove(); } catch (e) {} }
+      destroy: function () { alive = false; if (MEIKO.gps.offFix) MEIKO.gps.offFix(onFix); try { map.remove(); } catch (e) {} }
     };
     // Size can be wrong when the container was just inserted (sheets, route changes).
     setTimeout(function () { if (alive) map.invalidateSize(); }, 60);
@@ -448,8 +448,8 @@
           MEIKO.storage.set(AREAS_KEY, list);
         }
         ui.toast(cancelled ? 'Download cancelled' : r.failed ? 'Saved with ' + r.failed + ' missing tiles' : 'Area saved for offline use');
-        render(); drawRects();
-      }, function (e) { job = null; ui.toast(e.message); render(); });
+        if (box.isConnected) { render(); drawRects(); } // the user may have left the map page while it downloaded
+      }, function (e) { job = null; ui.toast(e.message); if (box.isConnected) render(); });
     }
     ctl.map.on('moveend zoomend', function () { if (!job && box.isConnected) { var est = ui.$('[data-est]', box); if (est) render(); } });
     drawRects(); render();
