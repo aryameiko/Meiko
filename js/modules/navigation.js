@@ -137,6 +137,7 @@
         ui.notice('warn', '<b>Estimates only.</b> Sea distances are approximate planning figures and port positions are approximate. Plan passages with official charts.') +
         '<div class="search" style="margin:0">' + icon('i-search') + '<input type="search" placeholder="Search port (name or city)…" data-filter data-no-persist></div>' +
         portSelect('from', 'Departure port') + portSelect('to', 'Destination port') +
+        '<div class="port-map-wrap"><div class="map-box port-map" data-pmap></div><small class="hint" data-pmap-hint>Tap a port on the map: first the departure, then the destination.</small></div>' +
         actions('Calculate', '<button class="btn btn-ghost" type="button" data-swap>' + icon('i-swap') + 'Swap</button>'),
         ui.empty('i-anchor', 'Choose two ports', 'Results show the estimated sea distance, straight-line distance and bearings.'),
         ui.help('About these distances',
@@ -191,10 +192,49 @@
         }
         ui.showResult(out, ui.resultCard(A.name + ' → ' + B.name, body, { copy: true, icon: 'i-anchor', badge: '<span class="badge info">estimate</span>', foot: 'Estimated sea distance for planning only. ' + GC_NOTE }), copy);
       }
-      form.addEventListener('change', function () { calc(true); });
+      /* ---- map: every port with a position; tap to choose; departure/destination highlighted ---- */
+      var pm = null, pmMarkers = {}, pmLine = null, pmEnds = [];
+      function initMap() {
+        if (pm || !MEIKO.map || !window.L) return;
+        pm = MEIKO.map.create(ui.$('[data-pmap]', form), { markers: false, noRemember: true, center: [-2.5, 118], zoom: 4 });
+        if (!pm) return;
+        var L = pm.L;
+        all.forEach(function (p) {
+          if (!p.port) return;
+          pmMarkers[p.value] = L.marker([p.port.lat, p.port.lon], { icon: L.divIcon({ className: 'mk pm-dot', iconSize: [14, 14], iconAnchor: [7, 7] }), title: p.name, keyboard: false })
+            .bindTooltip(esc(p.name), { direction: 'top', offset: [0, -6] })
+            .on('click', function (e) {
+              L.DomEvent.stop(e);
+              if (!from.value || to.value) { from.value = p.value; to.value = ''; }
+              else if (p.value !== from.value) to.value = p.value;
+              form.dispatchEvent(new Event('change'));
+            }).addTo(pm.map);
+        });
+        updateMap(true);
+      }
+      function updateMap(fit) {
+        if (!pm) return;
+        var L = pm.L, A = find(from.value), B = find(to.value);
+        if (pmLine) { pm.map.removeLayer(pmLine); pmLine = null; }
+        pmEnds.forEach(function (m) { pm.map.removeLayer(m); }); pmEnds = [];
+        var pts = [];
+        [[A, 'A', 'pm-a'], [B, 'B', 'pm-b']].forEach(function (x) {
+          if (!x[0] || !x[0].port) return;
+          var ll = [x[0].port.lat, x[0].port.lon]; pts.push(ll);
+          pmEnds.push(L.marker(ll, { icon: L.divIcon({ className: 'mk pm-end ' + x[2], html: x[1], iconSize: [28, 28], iconAnchor: [14, 14] }), zIndexOffset: 1000, keyboard: false, interactive: false })
+            .bindTooltip(esc(x[0].name), { permanent: true, direction: 'right', offset: [12, 0], className: 'pm-label' }).addTo(pm.map));
+        });
+        if (A && B && A.port && B.port) pmLine = L.polyline(MEIKO.map.gcPoints({ lat: A.port.lat, lon: A.port.lon }, { lat: B.port.lat, lon: B.port.lon }), { className: 'pm-line', interactive: false }).addTo(pm.map);
+        var hint = ui.$('[data-pmap-hint]', form);
+        if (hint) hint.textContent = !from.value ? 'Tap a port on the map: first the departure, then the destination.' : !to.value ? 'Now tap the destination port.' : 'Dashed line: straight line between the ports (not the sea route). Tap a port to start again.';
+        if (fit && pts.length === 2) pm.map.fitBounds(pts, { padding: [40, 40], maxZoom: 9 });
+        else if (fit && pts.length === 1 && !pm.map.getBounds().contains(pts[0])) pm.map.panTo(pts[0]);
+      }
+      setTimeout(initMap, 0);
+      form.addEventListener('change', function () { calc(true); updateMap(true); });
       form.addEventListener('submit', function (e) { e.preventDefault(); calc(false); });
       ui.$('[data-swap]', form).addEventListener('click', function () { var t = from.value; from.value = to.value; to.value = t; form.dispatchEvent(new Event('change')); });
-      ui.$('[data-reset]', form).addEventListener('click', function () { from.value = ''; to.value = ''; filter.value = ''; filter.dispatchEvent(new Event('input')); store.clear(); out.innerHTML = ui.empty('i-anchor', 'Choose two ports', 'Results show the estimated sea distance, straight-line distance and bearings.'); });
+      ui.$('[data-reset]', form).addEventListener('click', function () { from.value = ''; to.value = ''; filter.value = ''; filter.dispatchEvent(new Event('input')); store.clear(); updateMap(false); out.innerHTML = ui.empty('i-anchor', 'Choose two ports', 'Results show the estimated sea distance, straight-line distance and bearings.'); });
       calc(true);
     }
   });

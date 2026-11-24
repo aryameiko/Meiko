@@ -645,3 +645,13 @@ svg.i.rot-up { transform: rotate(-90deg); } svg.i.rot-down { transform: rotate(9
 .lopplot .lp-dr { fill: var(--muted); }
 .lopplot .lp-fix { fill: none; stroke: var(--danger); stroke-width: 2.5; }
 .lopplot .lp-t { fill: var(--text-2); font-size: 11px; font-weight: 700; }
+
+/* ---------- Port-to-Port map ---------- */
+.port-map-wrap { display: grid; gap: 6px; }
+.port-map { height: 320px; border-radius: 12px; overflow: hidden; border: 1px solid var(--border); }
+.pm-dot { background: #1B3A63; border: 2px solid #fff; border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,.45); cursor: pointer; }
+.pm-end { border: 3px solid #fff; border-radius: 50%; color: #fff; font-weight: 800; font-size: 13px; box-shadow: 0 2px 6px rgba(0,0,0,.45); }
+.pm-a { background: #1FA971; } .pm-b { background: #D9480F; }
+.pm-line { stroke: #D4A017; stroke-width: 3; stroke-dasharray: 8 7; fill: none; }
+.leaflet-tooltip.pm-label { font-weight: 700; font-size: 12px; padding: 2px 6px; }
+@media (max-width: 480px) { .port-map { height: 260px; } }
