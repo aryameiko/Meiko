@@ -529,6 +529,7 @@
       bindLayerBar(view, ctl, locErr);
       trk = MEIKO.trackUI.attach(ctl, panel);
       var lv = MEIKO.liveNav.attach(ctl, ui.$('[data-live-panel]', view));
+      var fleetLayer = MEIKO.fleet && MEIKO.fleet.attachMap ? MEIKO.fleet.attachMap(ctl) : null; // other MEIKO vessels online
       offlineCard(view, ctl);
 
       var modeSeg = ui.$('[data-mode]', view);
@@ -565,7 +566,7 @@
 
       var onNet = function () { var o = ui.$('[data-offline]', view); if (o) o.innerHTML = offlineNote(); };
       window.addEventListener('online', onNet); window.addEventListener('offline', onNet);
-      return function () { window.removeEventListener('online', onNet); window.removeEventListener('offline', onNet); lv.destroy(); ctl.destroy(); };
+      return function () { window.removeEventListener('online', onNet); window.removeEventListener('offline', onNet); lv.destroy(); if (fleetLayer) fleetLayer.destroy(); ctl.destroy(); };
   }
 
   MEIKO.features.register({

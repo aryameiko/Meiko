@@ -146,6 +146,13 @@ Paste the Firebase web config into `js/firebase-config.js` (`MEIKO.FIREBASE_CONF
 - **Limits.** Both sides need internet; public relays can be slow or down; phones pause web apps in the background. It is not a safety or distress system: use VHF/DSC and AIS. A commercial version with guaranteed delivery and history would need a proper backend (for example Firebase or Supabase under the owner's account).
 - **Code.** Protocol and crypto in `js/core/fleet.js` (tests in `tests/fleet-tests.js` with an in-memory relay), UI in `js/modules/fleet.js`, signing library bundled in `js/vendor/nostr-crypto.js` (@noble/curves + @noble/hashes, MIT).
 
+## Public fleet (v1.13.0)
+
+- **Online vessels see each other without a code.** After sign-in MEIKO joins the *public fleet* automatically (`PUBLIC_CODE` in `js/core/fleet.js`, same relays and protocol). Other online vessels show in Fleet & Chat **and on the main Map**; tap one for its data and **Chat** (private, end-to-end encrypted as before).
+- **Position is opt-in.** The first time, a sheet asks *"Tampilkan kapal Anda di peta?"*; until the user agrees (or switches *Share my position* on) only nickname and vessel are visible, not the position. *Go offline* leaves the public fleet (`publicOff`).
+- The public fleet's key is public by design, so messages to everyone are switched off there (no moderation); group chat and files to everyone remain in **private groups** with a code, which are still available.
+- Privacy Policy and Terms updated (version `2026-11-24.2`); signed-in users are asked to agree once more.
+
 ## Fixes (v1.12.1)
 
 - **GPS source Auto:** a running GPS watch (live navigation, *Track*, Fleet sharing) now moves to an external receiver when it is connected, and falls back to the phone GPS when the receiver is unplugged, instead of stopping. Changing the GPS source in Settings restarts a running watch on the new source.

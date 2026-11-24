@@ -71,7 +71,7 @@
     if (reconsent) {
       s = 'consent';
       h = '<div class="onb-hero"><img class="onb-full" src="assets/icons/logo-full.jpg" alt="MEIKO"></div>' +
-        '<h1>Privasi &amp; Syarat</h1><p class="onb-sub">MEIKO sekarang punya Kebijakan Privasi dan Syarat Penggunaan. Isinya menjelaskan data apa yang dipakai (akun di Firebase, Fleet &amp; Chat terenkripsi lewat relay publik, sisanya di perangkat Anda) dan batasan penting untuk navigasi. Mohon dibaca dan disetujui untuk melanjutkan.</p>' +
+        '<h1>Privasi &amp; Syarat</h1><p class="onb-sub">Kebijakan Privasi dan Syarat Penggunaan MEIKO diperbarui. Baru: semua pengguna yang online saling terlihat di <b>Armada Publik</b> Fleet &amp; Chat (nama panggilan dan kapal; posisi hanya jika Anda setuju), dan bisa chat pribadi terenkripsi. Isinya juga menjelaskan data lain yang dipakai (akun di Firebase, sisanya di perangkat Anda) dan batasan penting untuk navigasi. Mohon dibaca dan disetujui untuk melanjutkan.</p>' +
         consentCheck() + '<small class="hint" data-err></small>' +
         '<button class="btn btn-primary onb-next" data-agree>Setuju &amp; lanjutkan</button>';
     } else if (s === 'welcome') {

@@ -121,6 +121,25 @@ module.exports = function run(test) {
     }).then(function () { assert.strictEqual(b.got.chat.length, 0); b.stop(); });
   });
 
+  t('Fleet: public fleet — vessels with no code see each other; private chat inside it stays private; private groups stay apart', function () {
+    var relay = new MockRelay(), dms = { a: [], b: [], x: [] };
+    assert.ok(fleet.codeOk(fleet.PUBLIC_CODE));
+    var a = client(relay, fleet.PUBLIC_CODE, { onDM: function (m) { dms.a.push(m); } });
+    var b = client(relay, fleet.PUBLIC_CODE, { onDM: function (m) { dms.b.push(m); } });
+    var x = client(relay, fleet.PUBLIC_CODE, { onDM: function (m) { dms.x.push(m); } });
+    var g = client(relay, 'MEIKO-GRUP-0009');
+    return Promise.all([a.start(), b.start(), x.start(), g.start()]).then(function () { return wait(20); })
+      .then(function () { return a.sendLive({ name: 'KM Satu', pos: { lat: -6.2, lon: 106.8, cog: 90, sog: 5, t: Date.now() } }); })
+      .then(function () { return a.sendDM(b.pubkey, 'Halo dari KM Satu', { name: 'KM Satu' }); })
+      .then(function () { return wait(60); }).then(function () {
+        assert.strictEqual(b.got.live.length, 1); assert.strictEqual(b.got.live[0].pos.lat, -6.2);
+        assert.strictEqual(x.got.live.length, 1);
+        assert.strictEqual(dms.b.length, 1); assert.strictEqual(dms.b[0].text, 'Halo dari KM Satu');
+        assert.strictEqual(dms.x.length, 0, 'another public vessel read a private message');
+        assert.strictEqual(g.got.live.length + g.got.chat.length, 0, 'private group saw the public fleet');
+        [a, b, x, g].forEach(function (c) { c.stop(); });
+      });
+  });
   t('Fleet: private chat — only the recipient can read it; a third member with the group code cannot', function () {
     var relay = new MockRelay(), dms = { a: [], b: [], x: [] };
     var a = client(relay, 'MEIKO-PRIV-0005', { onDM: function (m) { dms.a.push(m); } });

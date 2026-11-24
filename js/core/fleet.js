@@ -36,6 +36,12 @@
   function navStatus(code) { return NAV_STATUS.filter(function (x) { return x.code === code; })[0] || null; }
   var CHUNK = 16000, MAX_FILE = 1024 * 1024, MAX_PARTS = Math.ceil(MAX_FILE / CHUNK);
   var CODE_ALPHA = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  /**
+   * The public fleet: one well-known room every signed-in MEIKO user joins by default, so online vessels see
+   * each other without exchanging a code. Its key is public (anyone with MEIKO's source can derive it), so the
+   * relays see only ciphertext but the content is NOT secret. Private chat inside it stays end-to-end encrypted.
+   */
+  var PUBLIC_CODE = 'MEIKO-PUBLIC-FLEET-V1';
 
   function normCode(code) { return String(code || '').trim().toUpperCase().replace(/\s+/g, ''); }
   function codeOk(code) { return normCode(code).length >= 8; }
@@ -302,6 +308,6 @@
     };
   }
 
-  return { KIND_LIVE: KIND_LIVE, KIND_CHAT: KIND_CHAT, NAV_STATUS: NAV_STATUS, navStatus: navStatus, CHUNK: CHUNK, MAX_FILE: MAX_FILE, DEFAULT_RELAYS: DEFAULT_RELAYS, normCode: normCode, codeOk: codeOk, newCode: newCode,
+  return { PUBLIC_CODE: PUBLIC_CODE, KIND_LIVE: KIND_LIVE, KIND_CHAT: KIND_CHAT, NAV_STATUS: NAV_STATUS, navStatus: navStatus, CHUNK: CHUNK, MAX_FILE: MAX_FILE, DEFAULT_RELAYS: DEFAULT_RELAYS, normCode: normCode, codeOk: codeOk, newCode: newCode,
     deriveRoom: deriveRoom, pairKey: pairKey, safetyCode: safetyCode, shortId: shortId, encrypt: encrypt, decrypt: decrypt, signEvent: signEvent, verifyEvent: verifyEvent, sanitize: sanitize, createClient: createClient };
 });

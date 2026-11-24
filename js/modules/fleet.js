@@ -1,20 +1,24 @@
 /*
  * MEIKO — Fleet & Chat.
- * Vessels that join the same group code see each other on a map (name, avatar, COG/SOG, last seen) and can chat.
- * No MEIKO server and no account: messages go through public Nostr relays, encrypted with a key derived from the
- * group code (js/core/fleet.js). Sharing your position is off until you switch it on.
- * Storage: 'fleet' = { code, joined, share, name, relays }, 'fleet:sk' = this device's random signing key,
+ * Every signed-in user joins the public fleet automatically (v1.13.0), so online vessels see each other on a map
+ * (name, avatar, COG/SOG, last seen) and can start a private chat. A private group with its own code is optional.
+ * No MEIKO server: messages go through public Nostr relays, encrypted with a key derived from the group code
+ * (js/core/fleet.js; the public fleet's code is public). Sharing your position is off until you agree.
+ * Storage: 'fleet' = { code (private group), joined (in that group), share, shareAsked, publicOff, name, relays },
+ * 'fleet:sk' = this device's random signing key,
  * 'fleet:chat:<tag>' = last 100 messages of a group (kept on this device).
  */
 (function () {
   'use strict';
   var ui = MEIKO.ui, icon = ui.icon, esc = ui.esc, C = window.MeikoCore;
-  var KEY = 'fleet', ONLINE_MS = 3 * 60 * 1000, BEAT_MS = 30000, MIN_GAP_MS = 10000;
+  var PUB = C.fleet.PUBLIC_CODE, KEY = 'fleet', ONLINE_MS = 3 * 60 * 1000, BEAT_MS = 30000, MIN_GAP_MS = 10000;
 
   /* ======================= session (lives while the app is open) ======================= */
-  var st = { dm: {}, dmName: {}, unread: {}, view: 'group', client: null, tag: null, peers: {}, chat: [], status: { relays: 0, connected: 0 }, fix: null, prevFix: null, lastSent: 0, timer: null, joining: false };
+  var st = { dm: {}, dmName: {}, unread: {}, view: 'group', client: null, tag: null, peers: {}, chat: [], status: { relays: 0, connected: 0 }, fix: null, prevFix: null, lastSent: 0, timer: null, joining: false, code: null };
   var subs = [];
-  function cfg() { return Object.assign({ code: '', joined: false, share: false, name: '', relays: '' }, MEIKO.storage.get(KEY, {})); }
+  function cfg() { return Object.assign({ code: '', joined: false, share: false, shareAsked: false, publicOff: false, name: '', relays: '' }, MEIKO.storage.get(KEY, {})); }
+  /** In the public fleet (everyone), not a private group. */
+  function isPublic() { return st.code === PUB; }
   function saveCfg(p) { MEIKO.storage.set(KEY, Object.assign(cfg(), p)); }
   function emit(what) { subs.forEach(function (fn) { try { fn(what); } catch (e) {} }); }
   function sk() {
@@ -118,6 +122,7 @@
   }
   st.prog = {};
   function onFile(f) {
+    if (isPublic() && !f.peer) return; // no files to everyone in the public fleet, only private ones
     var key = f.from + ':' + f.fid;
     delete st.prog[key];
     putFile(key, { bytes: f.bytes, name: f.meta.name, mime: f.meta.mime, at: Date.now() }).then(function () { emit('file'); }, function () { emit('file'); });
@@ -252,6 +257,7 @@
         emit('peers');
       },
       onChat: function (m) {
+        if (code === PUB) return; // messages to everyone are off in the public fleet (no moderation); private chat only
         if (!addChat(m)) return;
         emit('chat');
         if (!m.me && Date.now() - m.at < 120000 && !document.querySelector('[data-fleet-page]')) ui.toast('💬 ' + m.name + ': ' + m.text.slice(0, 60));
@@ -264,13 +270,13 @@
         if (!m.me && Date.now() - m.at < 120000 && !(st.view === m.peer && document.querySelector('[data-fleet-page]'))) ui.toast('🔒 ' + peerName(m.peer) + ': ' + m.text.slice(0, 60));
       }
     });
-    st.client = client;
+    st.client = client; st.since = Date.now();
     return client.start().then(function (tag) {
       if (st.client !== client) return;
-      st.tag = tag; st.joining = false;
+      st.tag = tag; st.joining = false; st.code = code;
       st.chat = (MEIKO.storage.get(chatKey(), []) || []).filter(function (m) { return m && m.id && typeof m.text === 'string'; });
       loadDM();
-      saveCfg({ code: code, joined: true });
+      if (code === PUB) saveCfg({ joined: false, publicOff: false }); else saveCfg({ code: code, joined: true });
       if (cfg().share) ensureGps();
       MEIKO.gps && MEIKO.gps.offFix && MEIKO.gps.offFix(onFix); MEIKO.gps && MEIKO.gps.onFix(onFix);
       clearInterval(st.timer); st.timer = setInterval(beat, BEAT_MS);
@@ -281,18 +287,19 @@
   function leave(silent) {
     clearInterval(st.timer); st.timer = null;
     if (st.client) { try { st.client.sendLive({ k: 'bye', name: me().name }); } catch (e) {} var c = st.client; setTimeout(function () { c.stop(); }, 400); }
-    st.client = null; st.tag = null; st.peers = {}; st.chat = []; st.dm = {}; st.dmName = {}; st.unread = {}; st.view = 'group'; st.status = { relays: 0, connected: 0 };
+    var was = st.code;
+    st.client = null; st.tag = null; st.code = null; st.peers = {}; st.chat = []; st.dm = {}; st.dmName = {}; st.unread = {}; st.view = 'group'; st.status = { relays: 0, connected: 0 };
     if (MEIKO.gps && MEIKO.gps.offFix) MEIKO.gps.offFix(onFix);
     gpsOff();
-    if (!silent) { saveCfg({ joined: false }); emit('all'); }
+    if (!silent) { saveCfg(was === PUB ? { publicOff: true } : { joined: false }); emit('all'); }
   }
   function setShare(on) {
-    saveCfg({ share: !!on });
+    saveCfg({ share: !!on, shareAsked: true });
     if (on) ensureGps(); else gpsOff(); // stop the GPS again when sharing is switched off (saves battery)
     beat(); emit('status');
   }
   function sendChat(text) {
-    text = String(text || '').trim(); if (!text || !st.client) return Promise.resolve(null);
+    text = String(text || '').trim(); if (!text || !st.client || isPublic()) return Promise.resolve(null);
     var m = me();
     return st.client.sendChat(text, { name: m.name, callsign: m.callsign, v: m.v });
   }
@@ -304,12 +311,48 @@
   function peersSorted() {
     return Object.keys(st.peers).map(function (k) { return st.peers[k]; }).sort(function (a, b) { return b.at - a.at; });
   }
-  // Resume the group after a reload (sharing resumes only if it was switched on).
-  setTimeout(function () { var c = cfg(); if (c.joined && c.code && supported() && navigator.onLine !== false) join(c.code).catch(function () {}); }, 1200);
+  /** Signed in and past the welcome / consent screens. */
+  function gateOpen() {
+    if (document.body.classList.contains('onb-open')) return false;
+    return !(MEIKO.onboarding && MEIKO.onboarding.required() && !(MEIKO.auth && MEIKO.auth.isComplete()));
+  }
+  /**
+   * Join automatically once the user is signed in: their private group if they are in one, else the public fleet
+   * (unless they chose to go offline). Sharing resumes only if it was switched on.
+   */
+  function autoStart() {
+    if (!supported()) return;
+    if (!gateOpen()) { if (st.client && MEIKO.onboarding && MEIKO.onboarding.required() && !MEIKO.auth.isComplete()) leave(true); return; }
+    if (!st.client) {
+      if (st.joining || navigator.onLine === false) return;
+      var c = cfg();
+      if (c.joined && c.code) join(c.code).catch(function () {});
+      else if (!c.publicOff) join(PUB).catch(function () {});
+      return;
+    }
+    if (!cfg().share && !cfg().shareAsked) askShare();
+  }
+  /** Ask once, clearly, before anyone sees this vessel's position (opt-in). */
+  function askShare() {
+    if (st.asking || st.askedNow || document.querySelector('.sheet-backdrop')) return;
+    st.asking = true;
+    var chose = false;
+    ui.sheet({ title: 'Tampilkan kapal Anda di peta?', html:
+      '<p>Di Fleet &amp; Chat dan Peta, MEIKO sekarang menampilkan <b>semua kapal pengguna MEIKO yang sedang online</b>, tanpa kode grup.</p>' +
+      '<p>Jika Anda setuju, <b>posisi, haluan (COG), kecepatan (SOG), nama panggilan, dan avatar kapal</b> Anda terlihat oleh semua pengguna MEIKO yang online. Posisi dikirim tiap 30 detik, hanya selama MEIKO terbuka. Email Anda tidak pernah ditampilkan.</p>' +
+      '<p class="small muted">Tanpa berbagi posisi, Anda tetap bisa melihat kapal lain dan chat pribadi. Anda bisa mengubahnya kapan saja di Fleet &amp; Chat → <i>Share my position</i>. Chat pribadi tetap terenkripsi ujung ke ujung. Lihat <a href="privacy.html" target="_blank" rel="noopener">Kebijakan Privasi</a>.</p>' +
+      '<div class="actions"><button class="btn btn-primary" data-yes>' + icon('i-check') + 'Ya, tampilkan posisi saya</button><button class="btn btn-ghost" data-no>Tidak sekarang</button></div>',
+      onMount: function (body, close) {
+        ui.$('[data-yes]', body).addEventListener('click', function () { chose = true; saveCfg({ shareAsked: true }); close(); setShare(true); ui.toast('Posisi Anda dibagikan ke kapal MEIKO yang online.'); });
+        ui.$('[data-no]', body).addEventListener('click', function () { chose = true; saveCfg({ shareAsked: true }); close(); });
+      },
+      onClose: function () { st.asking = false; if (!chose) st.askedNow = true; /* closed with X: ask again next time MEIKO opens */ } });
+  }
+  setTimeout(autoStart, 1200);
+  setInterval(autoStart, 4000);
   function wake() {
-    var c = cfg();
-    if (!c.joined || !c.code || navigator.onLine === false) return;
-    if (!st.client) { if (!st.joining) join(c.code).catch(function () {}); return; }
+    if (navigator.onLine === false) return;
+    if (!st.client) { autoStart(); return; }
     if (st.client.reconnect) st.client.reconnect();
     setTimeout(beat, 3000);
   }
@@ -317,7 +360,7 @@
   // Phones close the connections while MEIKO is in the background: reconnect as soon as it is opened again.
   document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') wake(); });
 
-  MEIKO.fleet = { join: join, leave: leave, setShare: setShare, sendChat: sendChat, sendDM: sendDM, sendAttachment: sendAttachment, fileURL: fileURL, state: st, cfg: cfg, subscribe: function (fn) { subs.push(fn); return function () { subs = subs.filter(function (x) { return x !== fn; }); }; } };
+  MEIKO.fleet = { attachMap: attachMap, isPublic: isPublic, join: join, leave: leave, setShare: setShare, sendChat: sendChat, sendDM: sendDM, sendAttachment: sendAttachment, fileURL: fileURL, state: st, cfg: cfg, subscribe: function (fn) { subs.push(fn); return function () { subs = subs.filter(function (x) { return x !== fn; }); }; } };
 
   /* ======================= page ======================= */
   function ago(ms) {
@@ -331,25 +374,100 @@
     return { type: t.id, h: p.vessel.h || t.def.h, s: p.vessel.s || t.def.s, a: p.vessel.a || t.def.a };
   }
   function online(p) { return !p.left && Date.now() - p.at < ONLINE_MS; }
+  function nsBadge(p) { var x = p.ns != null && C.fleet.navStatus(p.ns); return x ? '<span class="ns-badge ns-' + x.code + '">' + x.icon + ' ' + esc(x.short) + '</span>' : ''; }
+  /** Markers for the other vessels on a MEIKO map controller (Fleet page or the main Map). Tap → onTap(id). */
+  function markerLayer(fm, onTap) {
+    var markers = {};
+    function paint(fit) {
+      var L = fm.L, keep = {}, pts = [], added = false;
+      peersSorted().forEach(function (p) {
+        if (!p.pos) return;
+        keep[p.id] = 1;
+        var v = vesselOf(p), moving = p.pos.sog == null || p.pos.sog > 0.5, hdg = moving ? p.pos.cog : null;
+        var icon = v ? L.divIcon({ className: 'mk vsl-mk' + (online(p) ? '' : ' stale'), html: MEIKO.vessel.markerHTML(v, hdg), iconSize: hdg != null ? [34, 68] : [76, 46], iconAnchor: hdg != null ? [17, 34] : [38, 39] })
+          : L.divIcon({ className: 'mk pm-dot fleet-dot' + (online(p) ? '' : ' stale'), iconSize: [16, 16], iconAnchor: [8, 8] });
+        var tip = '<b>' + esc(p.name) + '</b> ' + nsBadge(p) + ' · ' + (online(p) ? 'online' : ago(p.pos.seen || p.at)) + '<br>COG ' + deg(p.pos.cog) + ' · SOG ' + kn(p.pos.sog);
+        var ll = [p.pos.lat, p.pos.lon]; pts.push(ll);
+        if (!markers[p.id]) added = markers[p.id] = L.marker(ll, { icon: icon, keyboard: false, title: p.name }).bindTooltip(tip, { permanent: true, direction: 'top', offset: [0, -10], className: 'pm-label fleet-label', interactive: true })
+          .on('click', (function (pid) { return function (e) { L.DomEvent.stop(e); onTap(pid); }; })(p.id)).addTo(fm.map);
+        else { markers[p.id].setLatLng(ll).setIcon(icon); markers[p.id].setTooltipContent(tip); }
+      });
+      Object.keys(markers).forEach(function (k) { if (!keep[k]) { fm.map.removeLayer(markers[k]); delete markers[k]; } });
+      if ((fit || added) && fit !== false && pts.length) { var mf = st.fix || (MEIKO.gps && MEIKO.gps.last && MEIKO.gps.last()); if (mf && isFinite(mf.lat)) pts.push([mf.lat, mf.lon]); fm.map.invalidateSize(); if (pts.length > 1) fm.map.fitBounds(pts, { padding: [50, 50], maxZoom: 12 }); else fm.map.setView(pts[0], 10); }
+    }
+    function clear() { Object.keys(markers).forEach(function (k) { try { fm.map.removeLayer(markers[k]); } catch (e) {} }); markers = {}; }
+    return { paint: paint, clear: clear };
+  }
+  /** Tap a vessel (map icon or list): its data, plus Chat and (optionally) Show on map. */
+  function vesselSheet(id, opts) {
+    var p = st.peers[id]; if (!p) return;
+    var v = vesselOf(p), t = v && MEIKO.vessel.types.filter(function (x) { return x.id === v.type; })[0], rows = [];
+    var nsx = p.ns != null && C.fleet.navStatus(p.ns);
+    rows.push(['Nav status', nsx ? '<span class="ns-badge ns-' + nsx.code + '">' + nsx.icon + ' ' + esc(nsx.label) + '</span>' : 'Not set']);
+    rows.push(['Online', online(p) ? '<span class="dot ok"></span> online' : (p.left ? 'left · ' : 'last seen ') + ago(p.at)]);
+    if (t) rows.push(['Vessel type', esc(t.label)]);
+    if (p.callsign) rows.push(['Call sign', esc(p.callsign)]);
+    if (p.pos) {
+      rows.push(['Position', esc(ui.coord(p.pos.lat, 'lat')) + '<br>' + esc(ui.coord(p.pos.lon, 'lon'))]);
+      rows.push(['COG / SOG', deg(p.pos.cog) + ' · ' + kn(p.pos.sog)]);
+      var mf = st.fix || (MEIKO.gps && MEIKO.gps.last && MEIKO.gps.last());
+      if (mf && isFinite(mf.lat)) { var g = C.geo.greatCircle(mf.lat, mf.lon, p.pos.lat, p.pos.lon); rows.push(['From you', ui.num(g.distanceNM, g.distanceNM < 10 ? 2 : 1) + ' NM · ' + ui.bearing(g.initialBearing) + ' T']); }
+      rows.push(['Position time', ago(p.pos.t || p.pos.seen || p.at)]);
+    } else rows.push(['Position', 'Not shared']);
+    ui.sheet({ title: p.name, html: '<div class="fleet-sheet">' + (v ? '<div class="fs-art">' + MEIKO.vessel.side(v.type, v) + '</div>' : '') + ui.kv(rows) +
+      '<div class="actions"><button class="btn btn-primary" data-chatnow>' + icon('i-chat') + 'Chat' + (st.unread[id] ? ' <span class="badge-n">' + st.unread[id] + '</span>' : '') + '</button>' +
+      (p.pos && opts.onMap ? '<button class="btn btn-ghost" data-mapnow>' + icon('i-map') + 'Show on map</button>' : '') + '</div></div>',
+      onMount: function (body, close) {
+        ui.$('[data-chatnow]', body).addEventListener('click', function () { close(); opts.onChat(id); });
+        var m = ui.$('[data-mapnow]', body); if (m) m.addEventListener('click', function () { close(); opts.onMap(p); });
+      } });
+  }
+  /** Show the other online vessels on the main Map too. Tap one → its data and Chat (opens Fleet & Chat). */
+  function attachMap(ctl) {
+    if (!ctl || !ctl.map || !ctl.L) return { destroy: function () {} };
+    var lay = markerLayer(ctl, function (id) {
+      vesselSheet(id, { onChat: function (pid) { st.view = pid; st.focusChat = true; location.hash = '#/t/fleet'; } });
+    });
+    /* A small button on the map: how many vessels are online; tap it to zoom to them. */
+    var L = ctl.L, btn = null, Ctl = L.Control.extend({ options: { position: 'topright' }, onAdd: function () {
+      btn = L.DomUtil.create('button', 'fleet-count'); btn.type = 'button'; btn.hidden = true;
+      L.DomEvent.disableClickPropagation(btn);
+      L.DomEvent.on(btn, 'click', function () { lay.paint(true); });
+      return btn;
+    } });
+    var ctrl = new Ctl().addTo(ctl.map);
+    function paint() {
+      lay.paint(false);
+      var n = peersSorted().filter(function (p) { return p.pos && online(p); }).length;
+      if (btn) { btn.hidden = !n; btn.innerHTML = icon('i-chat') + n + ' vessel' + (n === 1 ? '' : 's') + ' online'; btn.title = 'Show the other MEIKO vessels online'; }
+    }
+    paint();
+    var off = MEIKO.fleet.subscribe(function (w) { if (w === 'peers' || w === 'all') paint(); });
+    var t = setInterval(paint, 20000);
+    return { destroy: function () { off(); clearInterval(t); lay.clear(); try { ctrl.remove(); } catch (e) {} } };
+  }
   function kn(v) { return v == null ? '—' : ui.num(v, 1) + ' kn'; }
   function deg(v) { return v == null ? '—' : ui.bearing(v) + ' T'; }
 
   MEIKO.features.register({
     id: 'fleet', cat: 'navigation', order: 4, icon: 'i-chat', title: 'Fleet & Chat',
     desc: 'See other MEIKO vessels online and chat with them', keywords: 'chat fleet group armada kapal lain posisi teman pesan message',
-    lead: 'Join a group with a shared code to see the other vessels on a map and chat. Only your nickname and vessel are shown, never your email.',
+    lead: 'See the other MEIKO vessels that are online on the map and chat with them privately. No code needed. Only your nickname and vessel are shown, never your email.',
     render: function (view) {
       var c = cfg();
       var setup = '<div class="card card-pad form-gap" data-setup>' +
+        '<div data-pubjoin-box><p class="small">You are not in the public fleet. Join it to see all MEIKO vessels that are online.</p><div class="actions"><button type="button" class="btn btn-primary" data-pubjoin>' + icon('i-check') + 'Join the public fleet</button></div></div>' +
+        '<div class="card-title" data-setup-title>' + icon('i-lock') + 'Private group (optional)</div>' +
+        '<p class="small muted">Only vessels that enter the same code see each other there; you leave the public fleet while you are in a group.</p>' +
         '<label class="field"><span>Your name on the map</span><input data-name maxlength="40" placeholder="' + esc(me().name) + '" value="' + esc(c.name || '') + '"></label>' +
         '<label class="field"><span>Group code</span><input data-code autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="e.g. MEIKO-7KQP-29XD" value="' + esc(c.code || '') + '"><small class="hint">Everyone who uses the same code is in the same group. Treat it like a password.</small></label>' +
         '<div class="actions"><button type="button" class="btn btn-primary" data-join>' + icon('i-check') + 'Join group</button><button type="button" class="btn btn-ghost" data-new>' + icon('i-plus') + 'New code</button></div>' +
         '<div data-offline-note></div></div>';
       var live = '<div class="card card-pad form-gap fleet-live" data-live hidden>' +
-        '<div class="fleet-head"><div><div class="label">Group</div><b class="fleet-code" data-codeview></b></div><button type="button" class="btn btn-ghost btn-sm" data-share-code>' + icon('i-copy') + 'Share code</button></div>' +
+        '<div class="fleet-head"><div><div class="label" data-codelabel>Group</div><b class="fleet-code" data-codeview></b></div><button type="button" class="btn btn-ghost btn-sm" data-share-code>' + icon('i-copy') + 'Share code</button></div>' +
         '<div class="fleet-status" data-status></div>' +
         '<label class="fleet-switch"><input type="checkbox" data-share> <span><b>Share my position</b><small data-share-hint></small></span></label>' +
-        '<label class="field"><span>My status</span><select data-ns><option value="">— not set —</option>' + C.fleet.NAV_STATUS.map(function (x) { return '<option value="' + x.code + '">' + x.icon + '  ' + esc(x.label) + '</option>'; }).join('') + '</select><small class="hint">Shown to the group next to your vessel, like AIS.</small></label>' +
+        '<label class="field"><span>My status</span><select data-ns><option value="">— not set —</option>' + C.fleet.NAV_STATUS.map(function (x) { return '<option value="' + x.code + '">' + x.icon + '  ' + esc(x.label) + '</option>'; }).join('') + '</select><small class="hint">Shown next to your vessel, like AIS.</small></label>' +
         '<div data-ns-suggest></div>' +
         '<div class="port-map-wrap"><div class="map-box port-map fleet-map" data-fmap></div></div>' +
         '<div data-peers></div>' +
@@ -358,22 +476,31 @@
         '<form class="chat-form" data-chatform><button type="button" class="btn btn-ghost att-btn" data-attach aria-label="Send a photo or file">' + icon('i-clip') + '</button>' +
         '<input type="file" accept="image/*" capture="environment" data-pick="camera" hidden><input type="file" accept="image/*" data-pick="gallery" hidden><input type="file" accept="video/*" capture="environment" data-pick="vcam" hidden><input type="file" accept="video/*" data-pick="vgallery" hidden><input type="file" data-pick="file" hidden>' +
         '<input class="input" data-msg maxlength="500" placeholder="Type a message" autocomplete="off" enterkeyhint="send"><button class="btn btn-primary" type="submit">Send</button></form></div>' +
-        '<div class="actions"><button type="button" class="btn btn-ghost" data-leave>' + icon('i-x') + 'Leave group</button></div></div>';
-      view.innerHTML = ui.pageHead(this) + '<div data-fleet-page class="fleet-page">' + setup + live +
+        '<div class="actions"><button type="button" class="btn btn-ghost" data-leave>' + icon('i-x') + '<span data-leave-label>Leave group</span></button></div></div>';
+      view.innerHTML = ui.pageHead(this) + '<div data-fleet-page class="fleet-page">' + live + setup +
         ui.notice('warn', '<b>Not a safety system.</b> Fleet & Chat needs internet on both sides and uses free public relays that can be slow or down. For distress and collision avoidance use VHF (Ch 16 / DSC) and AIS.') +
-        ui.help('How it works and privacy', '<p>MEIKO has no server and no accounts. Messages travel through free public <b>Nostr relays</b>. Everything is encrypted with a key made from the group code, so the relays see only scrambled data. Anyone who knows the code can read the group, so share it only with people you trust.</p>' +
-          '<p>Your position is sent only while <b>Share my position</b> is on, every 30 seconds, and only while MEIKO is open. Phones pause web apps in the background, so others may see you as offline. <b>Private chat</b>: tap a vessel on the map or in the list, then <b>Chat</b>. No extra code is needed. It is encrypted a second time with a key only your device and theirs can compute, so other group members cannot read it. For very sensitive information you can optionally compare the number under <i>Verify</i> by VHF or phone. Relays and group members can still see <i>that</i> you sent a private message and when, but not to whom or what it says. Anyone who gets hold of an unlocked phone can read its messages.</p><p>Positions are not stored by the relays; recent chat (up to 2 days) is, so people who join later can read it. The last 100 messages are also kept on this device.</p><p><b>Photos and files</b> (the paperclip) are encrypted like messages (private ones end-to-end) and sent in small parts of 16 KB, because public relays refuse large messages. Photos are compressed to about 300 KB; other files can be up to 512 KB. A 300 KB photo takes about 20 parts and roughly 6–10 seconds; keep MEIKO open until it says sent. Some relays limit how fast you may send, so a large file can arrive incomplete. Received files are kept in this browser\'s storage.</p>' +
+        ui.help('How it works and privacy', '<p><b>Public fleet.</b> Everyone signed in to MEIKO joins it automatically, so vessels that are online see each other without a code. Anyone using MEIKO can see the nickname, vessel and (only if you share it) position of the vessels in it. Messages to everyone are switched off there; chat with a vessel privately instead.</p>' +
+          '<p>MEIKO has no server of its own. Messages travel through free public <b>Nostr relays</b>, encrypted, so the relays see only scrambled data. In a <b>private group</b> the key is made from the group code: anyone who knows the code can read the group, so share it only with people you trust. The public fleet\'s key is public by design.</p>' +
+          '<p>Your position is sent only while <b>Share my position</b> is on, every 30 seconds, and only while MEIKO is open. Phones pause web apps in the background, so others may see you as offline. <b>Private chat</b>: tap a vessel on the map or in the list, then <b>Chat</b>. No extra code is needed. It is encrypted a second time with a key only your device and theirs can compute, so nobody else, including other vessels in the fleet, can read it. For very sensitive information you can optionally compare the number under <i>Verify</i> by VHF or phone. Relays and group members can still see <i>that</i> you sent a private message and when, but not to whom or what it says. Anyone who gets hold of an unlocked phone can read its messages.</p><p>Positions are not stored by the relays; recent chat (up to 2 days) is, so people who join later can read it. The last 100 messages are also kept on this device.</p><p><b>Photos and files</b> (the paperclip) are encrypted like messages (private ones end-to-end) and sent in small parts of 16 KB, because public relays refuse large messages. Photos are compressed to about 300 KB; other files can be up to 512 KB. A 300 KB photo takes about 20 parts and roughly 6–10 seconds; keep MEIKO open until it says sent. Some relays limit how fast you may send, so a large file can arrive incomplete. Received files are kept in this browser\'s storage.</p>' +
           '<p>Vessels show as online if they sent something in the last 3 minutes; otherwise you see when they were last seen.</p>' +
           '<label class="field"><span>Relays (advanced)</span><textarea data-relays rows="3" placeholder="' + esc(C.fleet.DEFAULT_RELAYS.join('\n')) + '">' + esc(c.relays || '') + '</textarea><small class="hint">Leave empty for the defaults. One wss:// address per line. Everyone in a group needs at least one relay in common.</small></label>') + '</div>';
 
       var $ = function (s) { return ui.$(s, view); };
-      var fm = null, markers = {};
+      var fm = null, lay = null;
       function alive() { return document.body.contains(view) && $('[data-fleet-page]'); }
       function paintMode() {
         var joined = !!st.client;
-        $('[data-setup]').hidden = joined; $('[data-live]').hidden = !joined;
+        var pub = isPublic();
+        $('[data-setup]').hidden = joined && !pub; $('[data-live]').hidden = !joined;
+        $('[data-pubjoin-box]').hidden = joined || st.joining;
         $('[data-offline-note]').innerHTML = navigator.onLine === false ? ui.notice('warn', 'You are offline. Fleet & Chat needs an internet connection.', 'i-wifi-off') : '';
-        if (joined) { $('[data-codeview]').textContent = cfg().code; initMap(); }
+        if (joined) {
+          $('[data-codelabel]').textContent = pub ? 'Fleet' : 'Private group';
+          $('[data-codeview]').textContent = pub ? 'All MEIKO vessels online' : st.code;
+          $('[data-share-code]').hidden = pub;
+          $('[data-leave-label]').textContent = pub ? 'Go offline (leave the public fleet)' : cfg().publicOff ? 'Leave group' : 'Leave group (back to the public fleet)';
+          initMap();
+        }
         paintStatus(); paintPeers(); paintChat();
       }
       function paintStatus() {
@@ -381,7 +508,7 @@
         var s = st.status, n = peersSorted().filter(online).length, sh = cfg().share;
         $('[data-status]').innerHTML = '<span class="dot ' + (s.connected ? 'ok' : 'bad') + '"></span>' +
           (st.joining ? 'Connecting…' : s.connected ? 'Connected (' + s.connected + '/' + s.relays + ' relays)' : navigator.onLine === false ? 'Offline: waiting for internet' : 'Connecting to relays…') +
-          ' · ' + n + ' other vessel' + (n === 1 ? '' : 's') + ' online';
+          ' · ' + n + ' other vessel' + (n === 1 ? '' : 's') + ' online' + (!s.connected && !st.joining && navigator.onLine !== false && st.since && Date.now() - st.since > 20000 ? '<br><small>No relay answers. Some mobile networks or Wi-Fi block them; try another network.</small>' : '');
         $('[data-share]').checked = sh;
         var nsSel = $('[data-ns]'), cns = cfg().ns; if (document.activeElement !== nsSel) nsSel.value = cns == null ? '' : String(cns);
         var sug = '', cs = st.fix && sh ? cogSog() : null;
@@ -391,9 +518,9 @@
           else if (cs.sog != null && cs.sog > 2 && (cns === 1 || cns === 5 || cns === 6)) sug = '<div class="ns-sug">You are moving (' + kn(cs.sog) + '). Set status to <button type="button" class="chip" data-setns="0">▶ Under way</button> <button type="button" class="chip" data-setns="8">⛵ Sailing</button></div>';
         }
         $('[data-ns-suggest]').innerHTML = sug;
-        $('[data-share-hint]').textContent = sh ? (st.fix ? 'On. Others in this group see your position, COG and SOG.' : 'On. Waiting for a GPS fix…') : 'Off. Others see your name only, not where you are.';
+        var who = isPublic() ? 'All MEIKO users online' : 'Others in this group';
+        $('[data-share-hint]').textContent = sh ? (st.fix ? 'On. ' + who + ' see your position, COG and SOG.' : 'On. Waiting for a GPS fix…') : 'Off. Others see your name only, not where you are. Your vessel is not on their map.';
       }
-      function nsBadge(p) { var x = p.ns != null && C.fleet.navStatus(p.ns); return x ? '<span class="ns-badge ns-' + x.code + '">' + x.icon + ' ' + esc(x.short) + '</span>' : ''; }
       function peerRow(p) {
         var dist = '';
         if (p.pos && st.fix) { var g = C.geo.greatCircle(st.fix.lat, st.fix.lon, p.pos.lat, p.pos.lon); dist = ui.num(g.distanceNM, g.distanceNM < 10 ? 2 : 1) + ' NM · ' + ui.bearing(g.initialBearing) + ' T'; }
@@ -406,15 +533,15 @@
       function paintPeers() {
         if (!st.client) return;
         var list = peersSorted();
-        $('[data-peers]').innerHTML = list.length ? '<div class="label">Vessels in this group</div><div class="fleet-peers">' + list.map(peerRow).join('') + '</div>' :
-          '<p class="small muted">No other vessels yet. Share the group code; they appear here as soon as they join.</p>';
+        $('[data-peers]').innerHTML = list.length ? '<div class="label">' + (isPublic() ? 'Vessels' : 'Vessels in this group') + '</div><div class="fleet-peers">' + list.map(peerRow).join('') + '</div>' :
+          '<p class="small muted">' + (isPublic() ? 'No other vessels online right now. A vessel appears here as soon as someone else opens MEIKO; it is on the map when they share their position.' : 'No other vessels yet. Share the group code; they appear here as soon as they join.') + '</p>';
         paintMarkers();
       }
       function paintTabs() {
         var ids = Object.keys(st.dm).filter(function (k) { return st.dm[k].length; });
         if (st.view !== 'group' && ids.indexOf(st.view) < 0) ids.push(st.view);
         ids.sort(function (a, b) { var la = st.dm[a] && st.dm[a].length ? st.dm[a][st.dm[a].length - 1].at : Date.now(), lb = st.dm[b] && st.dm[b].length ? st.dm[b][st.dm[b].length - 1].at : Date.now(); return lb - la; });
-        $('[data-tabs]').innerHTML = '<button type="button" role="tab" class="chat-tab' + (st.view === 'group' ? ' on' : '') + '" data-tab="group">Group</button>' + ids.map(function (id) {
+        $('[data-tabs]').innerHTML = (isPublic() ? '' : '<button type="button" role="tab" class="chat-tab' + (st.view === 'group' ? ' on' : '') + '" data-tab="group">Group</button>') + ids.map(function (id) {
           return '<button type="button" role="tab" class="chat-tab' + (st.view === id ? ' on' : '') + '" data-tab="' + esc(id) + '">' + icon('i-lock') + esc(peerName(id)) + (st.unread[id] ? ' <span class="badge-n">' + st.unread[id] + '</span>' : '') + '</button>';
         }).join('');
       }
@@ -456,7 +583,10 @@
           list = st.dm[st.view] || [];
           $('[data-msg]').placeholder = 'Private message to ' + peerName(st.view);
         } else { $('[data-dmhead]').innerHTML = ''; list = st.chat; $('[data-msg]').placeholder = 'Message to the whole group'; }
+        var noGroup = !dm && isPublic();
+        $('[data-chatform]').hidden = noGroup;
         box.classList.toggle('dm', dm);
+        if (noGroup) { box.innerHTML = '<p class="small muted">To chat, tap a vessel on the map or in the list, then <b>Chat</b>. Private chats are end-to-end encrypted. Messages to everyone are off in the public fleet.</p>'; return; }
         box.innerHTML = list.length ? list.map(function (m) { return msgHTML(m, !dm); }).join('') : '<p class="small muted">' + (dm ? 'No private messages yet.' : 'No messages yet.') + '</p>';
         if (atBottom || list.length && list[list.length - 1].me) { box.scrollTop = box.scrollHeight; box.dataset.stick = '1'; } else delete box.dataset.stick;
         hydrate();
@@ -466,26 +596,9 @@
         if (fm || !MEIKO.map || !window.L) return;
         var f = st.fix || (MEIKO.gps && MEIKO.gps.last && MEIKO.gps.last());
         fm = MEIKO.map.create($('[data-fmap]'), { markers: false, noRemember: true, center: f ? [f.lat, f.lon] : [-2.5, 118], zoom: f ? 9 : 4 });
-        if (fm) { paintMarkers(true); }
+        if (fm) { lay = markerLayer(fm, tapVessel); paintMarkers(true); }
       }
-      function paintMarkers(fit) {
-        if (!fm) return;
-        var L = fm.L, keep = {}, pts = [], added = false;
-        peersSorted().forEach(function (p) {
-          if (!p.pos) return;
-          keep[p.id] = 1;
-          var v = vesselOf(p), moving = p.pos.sog == null || p.pos.sog > 0.5, hdg = moving ? p.pos.cog : null;
-          var icon = v ? L.divIcon({ className: 'mk vsl-mk' + (online(p) ? '' : ' stale'), html: MEIKO.vessel.markerHTML(v, hdg), iconSize: hdg != null ? [34, 68] : [76, 46], iconAnchor: hdg != null ? [17, 34] : [38, 39] })
-            : L.divIcon({ className: 'mk pm-dot fleet-dot' + (online(p) ? '' : ' stale'), iconSize: [16, 16], iconAnchor: [8, 8] });
-          var tip = '<b>' + esc(p.name) + '</b> ' + nsBadge(p) + ' · ' + (online(p) ? 'online' : ago(p.pos.seen || p.at)) + '<br>COG ' + deg(p.pos.cog) + ' · SOG ' + kn(p.pos.sog);
-          var ll = [p.pos.lat, p.pos.lon]; pts.push(ll);
-          if (!markers[p.id]) added = markers[p.id] = L.marker(ll, { icon: icon, keyboard: false, title: p.name }).bindTooltip(tip, { permanent: true, direction: 'top', offset: [0, -10], className: 'pm-label fleet-label', interactive: true })
-            .on('click', (function (pid) { return function (e) { L.DomEvent.stop(e); vesselSheet(pid); }; })(p.id)).addTo(fm.map);
-          else { markers[p.id].setLatLng(ll).setIcon(icon); markers[p.id].setTooltipContent(tip); }
-        });
-        Object.keys(markers).forEach(function (k) { if (!keep[k]) { fm.map.removeLayer(markers[k]); delete markers[k]; } });
-        if ((fit || added) && pts.length) { var mf = st.fix || (MEIKO.gps && MEIKO.gps.last && MEIKO.gps.last()); if (mf && isFinite(mf.lat)) pts.push([mf.lat, mf.lon]); fm.map.invalidateSize(); if (pts.length > 1) fm.map.fitBounds(pts, { padding: [50, 50], maxZoom: 12 }); else fm.map.setView(pts[0], 10); }
-      }
+      function paintMarkers(fit) { if (lay) lay.paint(fit); }
 
       var unsub = MEIKO.fleet.subscribe(function (what) {
         if (!alive()) { unsub(); return; }
@@ -498,6 +611,7 @@
       });
       var tick = setInterval(function () { if (!alive()) { clearInterval(tick); return; } paintPeers(); paintStatus(); }, 20000);
 
+      $('[data-pubjoin]').addEventListener('click', function () { saveCfg({ publicOff: false, joined: false }); join(PUB).catch(function (er) { ui.toast(er.message); }); });
       $('[data-new]').addEventListener('click', function () { $('[data-code]').value = C.fleet.newCode(window.MeikoNostrCrypto.randomBytes); });
       $('[data-name]').addEventListener('input', function (e) { saveCfg({ name: e.target.value.trim() }); });
       $('[data-relays]').addEventListener('change', function (e) { saveCfg({ relays: e.target.value.trim() }); if (st.client) join(cfg().code).catch(function (er) { ui.toast(er.message); }); });
@@ -506,7 +620,7 @@
         var btn = this; btn.disabled = true;
         join($('[data-code]').value).then(function () { btn.disabled = false; }, function (e) { btn.disabled = false; ui.toast(e.message); });
       });
-      $('[data-leave]').addEventListener('click', function () { if (fm) { try { fm.map.remove(); } catch (e) {} } fm = null; markers = {}; leave(); });
+      $('[data-leave]').addEventListener('click', function () { if (fm) { try { fm.map.remove(); } catch (e) {} } fm = null; lay = null; leave(); });
       $('[data-ns]').addEventListener('change', function (e) { setNS(e.target.value === '' ? null : +e.target.value); });
       view.addEventListener('click', function (e) { var b = e.target.closest('[data-setns]'); if (b) { setNS(+b.dataset.setns); st.slowSince = 0; st.lastMove = Date.now(); } });
       function setNS(v) { saveCfg({ ns: v }); beat(); paintStatus(); var x = v != null && C.fleet.navStatus(v); ui.toast(x ? 'Status: ' + x.label : 'Status cleared'); }
@@ -561,33 +675,13 @@
         var im = e.target.closest('.att-img img'); if (im) { ui.sheet({ title: im.alt || 'Photo', html: '<img class="att-full" src="' + im.src + '" alt="">' }); return; }
         var tb = e.target.closest('[data-tab]'); if (tb) { st.view = tb.dataset.tab; paintChat(); return; }
         var d = e.target.closest('[data-dm]'); if (d) { openDM(d.dataset.dm); return; }
-        var b = e.target.closest('[data-peer]'); if (b) vesselSheet(b.dataset.peer);
+        var b = e.target.closest('[data-peer]'); if (b) tapVessel(b.dataset.peer);
       });
-      /** Tap a vessel (map icon or list): its data, plus Chat and Show on map. */
-      function vesselSheet(id) {
-        var p = st.peers[id]; if (!p) return;
-        var v = vesselOf(p), t = v && MEIKO.vessel.types.filter(function (x) { return x.id === v.type; })[0], rows = [];
-        var nsx = p.ns != null && C.fleet.navStatus(p.ns);
-        rows.push(['Nav status', nsx ? '<span class="ns-badge ns-' + nsx.code + '">' + nsx.icon + ' ' + esc(nsx.label) + '</span>' : 'Not set']);
-        rows.push(['Online', online(p) ? '<span class="dot ok"></span> online' : (p.left ? 'left the group · ' : 'last seen ') + ago(p.at)]);
-        if (t) rows.push(['Vessel type', esc(t.label)]);
-        if (p.callsign) rows.push(['Call sign', esc(p.callsign)]);
-        if (p.pos) {
-          rows.push(['Position', esc(ui.coord(p.pos.lat, 'lat')) + '<br>' + esc(ui.coord(p.pos.lon, 'lon'))]);
-          rows.push(['COG / SOG', deg(p.pos.cog) + ' · ' + kn(p.pos.sog)]);
-          var mf = st.fix || (MEIKO.gps && MEIKO.gps.last && MEIKO.gps.last());
-          if (mf && isFinite(mf.lat)) { var g = C.geo.greatCircle(mf.lat, mf.lon, p.pos.lat, p.pos.lon); rows.push(['From you', ui.num(g.distanceNM, g.distanceNM < 10 ? 2 : 1) + ' NM · ' + ui.bearing(g.initialBearing) + ' T']); }
-          rows.push(['Position time', ago(p.pos.t || p.pos.seen || p.at)]);
-        } else rows.push(['Position', 'Not shared']);
-        ui.sheet({ title: p.name, html: '<div class="fleet-sheet">' + (v ? '<div class="fs-art">' + MEIKO.vessel.side(v.type, v) + '</div>' : '') + ui.kv(rows) +
-          '<div class="actions"><button class="btn btn-primary" data-chatnow>' + icon('i-chat') + 'Chat' + (st.unread[id] ? ' <span class="badge-n">' + st.unread[id] + '</span>' : '') + '</button>' +
-          (p.pos ? '<button class="btn btn-ghost" data-mapnow>' + icon('i-map') + 'Show on map</button>' : '') + '</div></div>',
-          onMount: function (body, close) {
-            ui.$('[data-chatnow]', body).addEventListener('click', function () { close(); openDM(id); });
-            var m = ui.$('[data-mapnow]', body); if (m) m.addEventListener('click', function () { close(); if (fm) { fm.map.setView([p.pos.lat, p.pos.lon], Math.max(fm.map.getZoom(), 11)); $('[data-fmap]').scrollIntoView({ behavior: 'smooth', block: 'center' }); } });
-          } });
+      function tapVessel(id) {
+        vesselSheet(id, { onChat: openDM, onMap: function (p) { if (fm) { fm.map.setView([p.pos.lat, p.pos.lon], Math.max(fm.map.getZoom(), 11)); $('[data-fmap]').scrollIntoView({ behavior: 'smooth', block: 'center' }); } } });
       }
       paintMode();
+      if (st.focusChat && st.client && st.view !== 'group') { st.focusChat = false; setTimeout(function () { if (alive()) openDM(st.view); }, 150); }
     }
   });
 })();

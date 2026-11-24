@@ -7,7 +7,7 @@
 (function () {
   'use strict';
   var ui = MEIKO.ui, esc = ui.esc, icon = ui.icon;
-  var VERSION = '2026-11-24';
+  var VERSION = '2026-11-24.2';
   var DOCS = { privacy: { file: 'privacy.html', title: 'Kebijakan Privasi' }, terms: { file: 'terms.html', title: 'Syarat Penggunaan' } };
   var cache = {};
 
