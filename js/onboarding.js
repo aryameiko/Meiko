@@ -78,6 +78,13 @@
           '<p class="small muted">' + icon('i-info') + ' Preview: the email is kept on this device only; no verification email is sent.</p>' +
           '<button class="btn btn-primary onb-next" data-next>Continue</button>';
       }
+    } else if (s === 'verify' && MEIKO.auth.verifyMethod() !== 'link') {
+      var sent = MEIKO.auth.verifyMethod() === 'code';
+      h = head('Enter the code', sent ? 'We sent a 6-digit code to <b>' + esc(draft.email) + '</b>. Open the email (check Spam too) and type the code here. It is valid for 10 minutes.' : 'Sending a 6-digit code to <b>' + esc(draft.email) + '</b>…') +
+        '<label class="field"><span>Confirmation code</span><input class="onb-otp" data-otp inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code" maxlength="7" placeholder="••••••"' + (sent ? '' : ' disabled') + '><small class="hint" data-err></small></label>' + offlineNote() +
+        '<button class="btn btn-primary onb-next" data-next' + (sent ? '' : ' disabled') + '>Confirm</button>' +
+        '<button type="button" class="btn btn-ghost onb-alt" data-resend>Send a new code</button>' +
+        '<button type="button" class="btn btn-ghost onb-alt" data-other>Use a different email</button>';
     } else if (s === 'verify') {
       h = head('Check your email', 'We sent a confirmation link to <b>' + esc(draft.email) + '</b>. Open the email (check Spam too), tap the link, then come back here.') +
         '<div class="onb-mail">' + icon('i-check') + '</div>' +
@@ -130,6 +137,14 @@
         step = p.verified ? STEPS.indexOf('nick') : STEPS.indexOf('verify'); paint();
       }, function (e) { busy(false); err(e.message); });
     }
+    if (s === 'verify' && MEIKO.auth.verifyMethod() !== 'link') {
+      var oi = el.querySelector('[data-otp]'), code = oi ? oi.value.replace(/\D/g, '') : '';
+      if (code.length !== 6) return err('Enter the 6-digit code from the email.');
+      busy(true);
+      return MEIKO.auth.verifyCode(code).then(function (p) {
+        if (p.verified) { step++; paint(); } else { busy(false); err('Not confirmed yet. Try again.'); }
+      }, function (e) { busy(false); if (e.signIn) { mode = 'old'; step = STEPS.indexOf('account'); paint(); err(e.message, true); } else { err(e.message); if (oi) oi.select(); } });
+    }
     if (s === 'verify') {
       busy(true);
       return MEIKO.auth.refreshVerification().then(function (p) {
@@ -168,8 +183,17 @@
     });
     var rs = el.querySelector('[data-resend]'); if (rs) rs.addEventListener('click', function () {
       if (Date.now() < resendAt) return err('Please wait ' + Math.ceil((resendAt - Date.now()) / 1000) + ' s before sending again.');
-      busy(true); MEIKO.auth.resendVerification().then(function () { busy(false); resendAt = Date.now() + 60000; err('Link sent again to ' + draft.email + '.', true); }, function (e) { busy(false); if (e.signIn) { mode = 'old'; step = STEPS.indexOf('account'); paint(); err(e.message, true); } else err(e.message); });
+      sendConfirm(true);
     });
+    function sendConfirm(again) {
+      busy(true); MEIKO.auth.resendVerification().then(function (m) {
+        resendAt = Date.now() + 60000;
+        if (m === 'done') return MEIKO.auth.refreshVerification().then(function () { step = STEPS.indexOf('nick'); paint(); });
+        paint(); err((m === 'link' ? 'Confirmation link sent' : 'Code sent') + (again ? ' again' : '') + ' to ' + draft.email + '.', true);
+      }, function (e) { busy(false); if (e.signIn) { mode = 'old'; step = STEPS.indexOf('account'); paint(); err(e.message, true); } else if (!again && MEIKO.auth.verifyMethod() === 'code') { paint(); err('A code was sent to ' + draft.email + ' a moment ago. Check your email (and Spam).', true); } else err(e.message); });
+    }
+    var otp = el.querySelector('[data-otp]'); if (otp) otp.addEventListener('input', function () { var v = otp.value.replace(/\D/g, '').slice(0, 6); if (otp.value !== v) otp.value = v; if (v.length === 6) next(); });
+    if (STEPS[step] === 'verify' && !MEIKO.auth.verifyMethod() && !draft.autoSent) { draft.autoSent = true; sendConfirm(false); }
     var ot = el.querySelector('[data-other]'); if (ot) ot.addEventListener('click', function () { MEIKO.auth.signOut(); draft.email = ''; mode = 'new'; step = STEPS.indexOf('account'); paint(); });
     el.querySelectorAll('[data-type]').forEach(function (x) { x.addEventListener('click', function () { keep(); var t = MEIKO.vessel.types.filter(function (y) { return y.id === x.dataset.type; })[0]; draft.type = t.id; draft.h = t.def.h; draft.s = t.def.s; draft.a = t.def.a; paint(); }); });
     el.querySelectorAll('[data-hull]').forEach(function (x) { x.addEventListener('click', function () { keep(); draft.h = x.dataset.hull; paint(); }); });

@@ -760,6 +760,7 @@ body.onb-open { overflow: hidden; }
 .onb-seg button.on { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.15); }
 .onb-card > small.hint { min-height: 18px; font-size: 13px; } .onb-card > small.hint.err { color: var(--danger); } .onb-card > small.hint.ok { color: var(--ok); }
 .onb-mail { display: grid; place-items: center; width: 84px; height: 84px; margin: 6px auto; border-radius: 50%; background: var(--accent-soft); color: var(--accent); } .onb-mail svg { width: 40px; height: 40px; }
+.onb-otp { font-size: 26px; letter-spacing: 10px; text-align: center; font-variant-numeric: tabular-nums; font-weight: 700; }
 .onb-warn { color: var(--warn, #B7791F); } .onb-warn svg.i { width: 14px; height: 14px; vertical-align: -2px; }
 
 .onb-full { width: min(320px, 80vw); height: auto; border-radius: 18px; box-shadow: 0 8px 28px rgba(3,20,46,.35); margin-bottom: 10px; }

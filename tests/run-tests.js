@@ -552,6 +552,35 @@ test('Ports: no position more than 4 km inland (Natural Earth 10m coast; river p
   assert.deepStrictEqual(estimates.sort(), ['id-miangas', 'id-ranai', 'id-tratai', 'tl-dili']);
 });
 
+console.log('\nEmail confirmation codes (Cloud Functions logic)');
+(function () {
+  var codes = require('../functions/codes.js'), S = 'test-secret', U = 'uid1', t = Date.UTC(2026, 10, 24, 10, 0, 0);
+  test('issue makes a 6-digit code; only a hash is kept', function () {
+    var r = codes.issue(S, U, null, t);
+    assert.ok(/^\d{6}$/.test(r.code)); assert.ok(!JSON.stringify(r.vc).includes(r.code)); assert.strictEqual(r.vc.c, 1); assert.strictEqual(r.vc.e, t + codes.TTL);
+  });
+  test('right code passes; wrong code counts tries; expiry and limits hold', function () {
+    var r = codes.issue(S, U, null, t), vc = r.vc, wrong = r.code === '000000' ? '111111' : '000000';
+    assert.ok(codes.check(S, U, vc, r.code, t + 1000).ok);
+    assert.ok(codes.check(S, U, vc, ' ' + r.code.slice(0, 3) + ' ' + r.code.slice(3), t).ok);
+    assert.ok(!codes.check(S, 'other', vc, r.code, t).ok);
+    assert.ok(!codes.check('other-secret', U, vc, r.code, t).ok);
+    assert.strictEqual(codes.check(S, U, vc, r.code, t + codes.TTL + 1).reason, 'expired');
+    assert.strictEqual(codes.check(S, U, vc, '12345', t).reason, 'format');
+    assert.strictEqual(codes.check(S, U, null, r.code, t).reason, 'none');
+    for (var i = 0; i < codes.MAX_TRIES; i++) { var x = codes.check(S, U, vc, wrong, t); vc = x.vc; }
+    assert.strictEqual(x.reason, 'tries'); assert.strictEqual(codes.check(S, U, vc, r.code, t).reason, 'tries');
+  });
+  test('resend waits 60 s and stops after the daily limit', function () {
+    var r = codes.issue(S, U, null, t);
+    assert.ok(codes.issue(S, U, r.vc, t + 30000).wait > 0);
+    var vc = r.vc; for (var i = 1; i < codes.MAX_PER_DAY; i++) vc = codes.issue(S, U, vc, t + i * 61000).vc;
+    assert.ok(codes.issue(S, U, vc, t + 20 * 61000).limit);
+    assert.ok(codes.issue(S, U, vc, t + 86400000).code, 'next day works again');
+  });
+  test('email text holds the code', function () { var m = codes.mail('042917'); assert.ok(m.subject.includes('042917') && m.html.includes('042917') && m.text.includes('10 menit')); });
+})();
+
 console.log('\nFleet & Chat');
 require('./fleet-tests.js')(function (name, fn) {
   return Promise.resolve().then(fn).then(function () { passed++; console.log('  ✓ ' + name); }, function (e) { failed++; console.log('  ✗ ' + name + '\n      ' + e.message); });

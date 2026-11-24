@@ -1,0 +1,58 @@
+# Deploys the email confirmation code service (functions/) to Firebase project meiko-33002.
+# Needs these repository secrets (Settings → Secrets and variables → Actions):
+#   FIREBASE_SERVICE_ACCOUNT  the whole JSON key of a Google Cloud service account (role: Owner)
+#   GMAIL_USER                the Gmail address that sends the codes
+#   GMAIL_APP_PASSWORD        a Gmail App Password (16 letters) for that address
+# CODE_SECRET is generated once and kept in Google Secret Manager.
+name: Deploy email-code service
+on:
+  push:
+    branches: [main]
+    paths: ['functions/**', 'firebase.json', '.github/workflows/functions.yml']
+  workflow_dispatch:
+concurrency: functions-deploy
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check secrets
+        id: chk
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          GU: ${{ secrets.GMAIL_USER }}
+          GP: ${{ secrets.GMAIL_APP_PASSWORD }}
+        run: |
+          missing=""
+          [ -z "$SA" ] && missing="$missing FIREBASE_SERVICE_ACCOUNT"
+          [ -z "$GU" ] && missing="$missing GMAIL_USER"
+          [ -z "$GP" ] && missing="$missing GMAIL_APP_PASSWORD"
+          if [ -n "$missing" ]; then echo "::warning::Not deployed yet. Missing repository secrets:$missing"; echo "ready=no" >> "$GITHUB_OUTPUT"; else echo "ready=yes" >> "$GITHUB_OUTPUT"; fi
+      - uses: actions/checkout@v4
+        if: steps.chk.outputs.ready == 'yes'
+      - uses: actions/setup-node@v4
+        if: steps.chk.outputs.ready == 'yes'
+        with:
+          node-version: 20
+      - name: Deploy
+        if: steps.chk.outputs.ready == 'yes'
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          GU: ${{ secrets.GMAIL_USER }}
+          GP: ${{ secrets.GMAIL_APP_PASSWORD }}
+        run: |
+          set -e
+          umask 077
+          printf '%s' "$SA" > "$RUNNER_TEMP/sa.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
+          (cd functions && npm ci --no-audit --no-fund)
+          npm i -g firebase-tools@13 --no-audit --no-fund
+          FB="firebase --project meiko-33002 --non-interactive"
+          printf '%s' "$GU" > "$RUNNER_TEMP/gu"; printf '%s' "$GP" | tr -d ' ' > "$RUNNER_TEMP/gp"
+          $FB functions:secrets:set GMAIL_USER --data-file "$RUNNER_TEMP/gu" --force
+          $FB functions:secrets:set GMAIL_APP_PASSWORD --data-file "$RUNNER_TEMP/gp" --force
+          if ! $FB functions:secrets:access CODE_SECRET > /dev/null 2>&1; then
+            openssl rand -hex 32 | tr -d '\n' > "$RUNNER_TEMP/cs"
+            $FB functions:secrets:set CODE_SECRET --data-file "$RUNNER_TEMP/cs" --force
+          fi
+          $FB deploy --only functions --force
+          rm -f "$RUNNER_TEMP"/sa.json "$RUNNER_TEMP"/gu "$RUNNER_TEMP"/gp "$RUNNER_TEMP"/cs

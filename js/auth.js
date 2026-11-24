@@ -23,7 +23,7 @@
   var active = 'local';
 
   /* ---- Firebase Auth (email + password, with verification email) ---- */
-  var fbAuth = null;
+  var fbAuth = null, method = '';
   function fbErr(e) {
     var c = (e && e.code) || '';
     var map = {
@@ -55,15 +55,47 @@
     function ready() { return fbAuth.authStateReady ? fbAuth.authStateReady().catch(function () {}) : Promise.resolve(); }
     function needSignIn() { var e = new Error('Please sign in again with your email and password.'); e.signIn = true; return e; }
     function asProfile(u) { return { email: u.email, verified: !!u.emailVerified, uid: u.uid }; }
+    /* Email confirmation by a 6-digit code: Cloud Functions sendCode / verifyCode (functions/index.js).
+       Until those are deployed (or if they fail), MEIKO falls back to Firebase's confirmation link. */
+    var FN_URL = 'https://asia-southeast2-' + cfg.projectId + '.cloudfunctions.net/';
+    function callFn(name, data) {
+      return ready().then(function () {
+        var u = fbAuth.currentUser; if (!u) throw needSignIn();
+        return u.getIdToken().then(function (tok) {
+          return fetch(FN_URL + name, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok }, body: JSON.stringify({ data: data || {} }) })
+            .then(function (r) {
+              return r.json().catch(function () { return {}; }).then(function (j) {
+                if (r.ok && j && 'result' in j) return j.result;
+                var e = new Error((j && j.error && j.error.message) || 'Server error (' + r.status + ')');
+                e.status = j && j.error && j.error.status; e.fnMissing = r.status === 404 || !e.status; throw e;
+              });
+            }, function () { if (navigator.onLine === false) throw fbErr({ code: 'auth/network-request-failed' }); var e = new Error('Code service not reachable'); e.fnMissing = true; throw e; });
+        });
+      });
+    }
+    /** Send a code; if the code service is not available, send the link instead. Resolves 'code' or 'link'. */
+    function sendConfirm(u) {
+      return callFn('sendCode').then(function (r) { method = r && r.verified ? 'done' : 'code'; return method; }, function (e) {
+        if (e.status === 'RESOURCE_EXHAUSTED') method = 'code'; /* a code was sent a moment ago and is still valid */
+        if (e.signIn || e.status === 'RESOURCE_EXHAUSTED' || /network/i.test(e.message) && navigator.onLine === false) throw e;
+        if (!e.fnMissing) console.warn('sendCode failed, using the link instead:', e.message);
+        return F.sendEmailVerification(u || fbAuth.currentUser).then(function () { method = 'link'; return method; }, function (x) { throw fbErr(x); });
+      });
+    }
     providers.firebase = {
       id: 'firebase', label: 'Firebase', verifies: true, passwords: true,
       signUp: function (email, pw) {
         return F.createUserWithEmailAndPassword(fbAuth, email, pw).then(function (c) {
-          return F.sendEmailVerification(c.user).catch(function () {}).then(function () { return asProfile(c.user); });
+          return sendConfirm(c.user).catch(function () {}).then(function () { return asProfile(c.user); });
         }, function (e) { throw fbErr(e); });
       },
       signIn: function (email, pw) { return F.signInWithEmailAndPassword(fbAuth, email, pw).then(function (c) { return asProfile(c.user); }, function (e) { throw fbErr(e); }); },
-      resend: function () { return ready().then(function () { if (!fbAuth.currentUser) throw needSignIn(); return F.sendEmailVerification(fbAuth.currentUser).catch(function (e) { throw fbErr(e); }); }); },
+      resend: function () { return ready().then(function () { if (!fbAuth.currentUser) throw needSignIn(); return sendConfirm(fbAuth.currentUser); }); },
+      verifyCode: function (code) {
+        return callFn('verifyCode', { code: String(code || '').replace(/\D/g, '') }).then(function () {
+          var u = fbAuth.currentUser; return F.reload(u).then(function () { return u.getIdToken(true).catch(function () {}); }).then(function () { return asProfile(fbAuth.currentUser); });
+        });
+      },
       refresh: function () { return ready().then(function () { var u = fbAuth.currentUser; if (!u) throw needSignIn(); return F.reload(u).then(function () { return asProfile(fbAuth.currentUser); }, function (e) { throw fbErr(e); }); }); },
       reset: function (email) { return F.sendPasswordResetEmail(fbAuth, email).catch(function (e) { throw fbErr(e); }); },
       signOut: function () { return F.signOut(fbAuth).catch(function () {}); }
@@ -90,7 +122,11 @@
     /** Firebase only: create an account (sends the verification email) / sign in / check verification. */
     signUp: function (email, pw) { email = String(email || '').trim().toLowerCase(); return providers[active].signUp(email, pw).then(saveAccount); },
     signIn: function (email, pw) { email = String(email || '').trim().toLowerCase(); return providers[active].signIn(email, pw).then(function (r) { var old = profile(); if (old && old.uid !== r.uid) MEIKO.storage.remove(KEY); return saveAccount(r); }); },
+    /** Sends a 6-digit code (or, if the code service is unavailable, a link). Resolves 'code' | 'link' | 'done'. */
     resendVerification: function () { return providers[active].resend(); },
+    /** How the last confirmation was sent: 'code', 'link' or '' (none yet in this session). */
+    verifyMethod: function () { return method; },
+    verifyCode: function (code) { return providers[active].verifyCode(code).then(saveAccount); },
     refreshVerification: function () { return providers[active].refresh().then(saveAccount); },
     resetPassword: function (email) { return providers[active].reset(String(email || '').trim().toLowerCase()); },
     signOut: function () { var pv = providers[active]; MEIKO.storage.remove(KEY); return pv.signOut ? pv.signOut() : Promise.resolve(); },
