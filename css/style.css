@@ -777,3 +777,9 @@ body.onb-open { overflow: hidden; }
 .legal-check input { width: 20px; height: 20px; flex: none; margin: 1px 0 0; accent-color: var(--navy-700); }
 .legal-check a { color: var(--focus); }
 body.onb-open .sheet-backdrop { z-index: 5100; }
+/* v1.13.0 General Group + block/report */
+.msg-who { background: none; border: 0; padding: 0; font: inherit; color: inherit; font-weight: 600; text-decoration: underline dotted; cursor: pointer; }
+.dm-head.gen-head { background: color-mix(in srgb, var(--gold-500) 12%, transparent); border-color: color-mix(in srgb, var(--gold-500) 40%, transparent); }
+.gen-head .btn { margin-top: 6px; }
+.gen-join { padding: 6px 2px; } .gen-join p { margin: 0 0 8px; }
+.fleet-sheet .fs-mod { margin-top: 4px; } .fleet-sheet .fs-mod + small { display: block; margin-top: 6px; }

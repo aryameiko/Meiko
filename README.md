@@ -149,8 +149,8 @@ Paste the Firebase web config into `js/firebase-config.js` (`MEIKO.FIREBASE_CONF
 ## Public fleet (v1.13.0)
 
 - **Online vessels see each other without a code.** After sign-in MEIKO joins the *public fleet* automatically (`PUBLIC_CODE` in `js/core/fleet.js`, same relays and protocol). Other online vessels show in Fleet & Chat **and on the main Map**; tap one for its data and **Chat** (private, end-to-end encrypted as before).
-- **Position is opt-in.** The first time, a sheet asks *"Tampilkan kapal Anda di peta?"*; until the user agrees (or switches *Share my position* on) only nickname and vessel are visible, not the position. *Go offline* leaves the public fleet (`publicOff`).
-- The public fleet's key is public by design, so messages to everyone are switched off there (no moderation); group chat and files to everyone remain in **private groups** with a code, which are still available.
+- **Position shared by default** (Meiko's choice). The first time, a notice *"Kapal Anda terlihat di peta"* says so, with *Sembunyikan posisi saya*. *Go offline* leaves the public fleet (`publicOff`).
+- **General Group**: the public fleet's group chat, opt-in (`cfg.general`, *Join General Group*). Not private (public key), not moderated: tap a name → **Block** (`cfg.blocked`, hides vessel and messages on this phone) or **Report** (prefilled GitHub issue with the vessel ID). Private groups with a code still exist.
 - Privacy Policy and Terms updated (version `2026-11-24.2`); signed-in users are asked to agree once more.
 
 ## Fixes (v1.12.1)
