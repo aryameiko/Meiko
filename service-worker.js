@@ -4,7 +4,7 @@
  * cache-first with a background refresh ("stale-while-revalidate") for same-origin GET requests.
  * Bump CACHE_VERSION whenever any file changes so clients pick up the new version.
  */
-var CACHE_VERSION = 'meiko-v1.6.1';
+var CACHE_VERSION = 'meiko-v1.6.2';
 var ASSETS = [
   './', 'index.html', 'manifest.json', 'css/style.css',
   'assets/icons/icon.svg', 'assets/icons/icon-192.png', 'assets/icons/icon-512.png', 'assets/icons/icon-maskable-512.png', 'assets/icons/apple-touch-icon.png',
@@ -47,7 +47,7 @@ function tileResponse(req) {
 }
 
 self.addEventListener('install', function (event) {
-  event.waitUntil(caches.open(CACHE_VERSION).then(function (cache) { return cache.addAll(ASSETS); }).then(function () { return self.skipWaiting(); }));
+  event.waitUntil(caches.open(CACHE_VERSION).then(function (cache) { return cache.addAll(ASSETS.map(function (u) { return new Request(u, { cache: 'reload' }); })); }).then(function () { return self.skipWaiting(); }));
 });
 
 self.addEventListener('activate', function (event) {

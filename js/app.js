@@ -4,7 +4,7 @@
  */
 (function () {
   'use strict';
-  MEIKO.VERSION = '1.6.1';
+  MEIKO.VERSION = '1.6.2';
   var ui = MEIKO.ui, F = MEIKO.features, icon = ui.icon, C = window.MeikoCore;
   var view = ui.$('#view'), cleanup = null, clockTimer = null, deferredInstall = null;
 
@@ -260,12 +260,23 @@
   syncOnline();
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
     window.addEventListener('load', function () {
-      navigator.serviceWorker.register('service-worker.js').then(function (reg) {
-        reg.addEventListener('updatefound', function () {
-          var nw = reg.installing; if (!nw) return;
-          nw.addEventListener('statechange', function () { if (nw.state === 'installed' && navigator.serviceWorker.controller) ui.toast('Update ready — reopen MEIKO to use it'); });
-        });
+      // Auto-update: when a new service worker takes over, reload once so the new version shows
+      // immediately (not on the next visit). Skipped on the very first install.
+      var hadController = !!navigator.serviceWorker.controller, reloading = false;
+      navigator.serviceWorker.addEventListener('controllerchange', function () {
+        if (!hadController || reloading) return;
+        reloading = true;
+        try { sessionStorage.setItem('meiko:updated', MEIKO.VERSION); } catch (e) {}
+        location.reload();
+      });
+      navigator.serviceWorker.register('service-worker.js', { updateViaCache: 'none' }).then(function (reg) {
+        var check = function () { if (navigator.onLine !== false) reg.update().catch(function () {}); };
+        check();
+        // Check again when the app comes back to the foreground (installed PWAs stay open for days).
+        document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') check(); });
+        setInterval(check, 30 * 60 * 1000);
       }).catch(function () { /* e.g. sandboxed preview: app still works online */ });
+      try { if (sessionStorage.getItem('meiko:updated')) { sessionStorage.removeItem('meiko:updated'); setTimeout(function () { ui.toast('MEIKO updated to v' + MEIKO.VERSION); }, 600); } } catch (e) {}
     });
   }
 
