@@ -46,7 +46,7 @@
       '<div class="sheet-body">' + (opts.html || '') + '</div></div>';
     document.body.appendChild(bd);
     var prevFocus = document.activeElement;
-    function close() { bd.remove(); document.removeEventListener('keydown', onKey); if (prevFocus && prevFocus.focus) prevFocus.focus(); }
+    function close() { if (!bd.parentNode) return; bd.remove(); document.removeEventListener('keydown', onKey); if (opts.onClose) try { opts.onClose(); } catch (e) {} if (prevFocus && prevFocus.focus) prevFocus.focus(); }
     function onKey(e) { if (e.key === 'Escape') close(); }
     bd.addEventListener('click', function (e) { if (e.target === bd || e.target.closest('[data-close]')) close(); });
     document.addEventListener('keydown', onKey);
@@ -197,6 +197,7 @@
     return '<div class="coord-field" data-coord="' + key + '">' +
       '<div class="cf-head"><span class="label">' + esc(label) + '</span>' +
       (opts.noGps ? '' : '<button type="button" class="chip" data-act="gps">' + icon('i-gps') + 'GPS</button>') +
+      '<button type="button" class="chip" data-act="map">' + icon('i-map') + 'Map</button>' +
       '<button type="button" class="chip" data-act="pick">' + icon('i-star') + (opts.ports ? 'Saved / Ports' : 'Saved') + '</button></div>' +
       '<div class="row">' +
       '<label class="field"><span>Latitude</span><input name="' + key + '-lat" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="06° 06.25′ S or −6.104"><small class="hint"></small></label>' +
@@ -233,6 +234,12 @@
       }, function (err) {
         sheet({ title: 'Location unavailable', html: notice('err', esc(err.message)) + '<p class="small muted mt-12">You can type the coordinates manually or pick a saved position instead.</p><div class="actions"><button class="btn btn-ghost" data-close data-lh>' + icon('i-info') + 'How to allow location</button></div>', onMount: function (body) { $('[data-lh]', body).addEventListener('click', function () { setTimeout(MEIKO.app.showLocationHelp, 0); }); } });
       }).then(function () { gpsBtn.disabled = false; gpsBtn.innerHTML = old; });
+    });
+    $('[data-act="map"]', box).addEventListener('click', function () {
+      var cur = api.isEmpty() ? null : api.get();
+      MEIKO.map.pick({ lat: cur && cur.ok ? cur.lat : null, lon: cur && cur.ok ? cur.lon : null, title: 'Pick on map' }, function (p) {
+        api.set(p.lat, p.lon); toast('Position set from map'); if (opts.onChange) opts.onChange();
+      });
     });
     $('[data-act="pick"]', box).addEventListener('click', function () {
       pickLocation({ ports: opts.ports }, function (loc) { api.set(loc.lat, loc.lon); if (opts.onChange) opts.onChange(); });

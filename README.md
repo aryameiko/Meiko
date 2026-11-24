@@ -49,6 +49,25 @@ The **Location permission** panel (Position & GPS and Settings) shows the permis
 instructions for iOS (Settings → Privacy & Security → Location Services → Safari Websites), Android and desktop when access is blocked.
 External accuracy is estimated as HDOP × 5 m. Checksums are verified; bad sentences are shown as rejected in the NMEA monitor.
 
+## Map (v1.3)
+
+`js/modules/map.js` uses Leaflet 1.9.4, bundled in `assets/vendor/leaflet/`, with no API key.
+
+- **Layers:**
+  - Street map: OpenStreetMap
+  - Satellite: Esri World Imagery, plus a place-name overlay
+  - Sea marks: OpenSeaMap
+  - Offline: a world outline that ships with the app (Natural Earth 1:50m, public domain; via world-atlas, rendered with topojson-client)
+- **Picking a point:** tap the map to see the point in DD, DDM and DMS. From there you can copy it, save it, open it in Google Maps or Google Earth (links only), or send it to Distance, Rhumb, Course, Coordinates, Qibla, Sun, Merpass or Maghrib. Every coordinate field also has a **Map** chip that opens a picker sheet.
+- **Route mode:** tap waypoints to see each leg's great-circle distance and initial course, plus the total.
+- **GPS:** shows the current fix with its accuracy circle. It uses the same sources as the rest of the app: phone or external receiver.
+- **Offline:**
+  - The service worker keeps tiles as you view them (`tiles-seen-v1`, newest ~2000).
+  - *Save visible area* downloads the visible area into `tiles-saved-v1` and keeps it until it is deleted. It saves a few zoom levels, capped at zoom 16 and 4000 tiles, two requests at a time, which keeps it within the OSM tile usage policy.
+  - With no signal the built-in outline is always available.
+- **Provider hook:** `MEIKO.map.addBaseLayer({ id, label, create(L) })` adds another base layer, for example Google Map Tiles once a key exists.
+- **Terms:** check the Esri imagery and OSM tile terms before commercial or high-traffic use. Self-hosted or paid tiles may be needed then.
+
 ## Accuracy & data status
 
 - **Port coordinates: sample / unverified.** Approximate harbour positions; each record has `verified: false`. Verify against official charts / port authority data, then set `verified: true` and `source`.
