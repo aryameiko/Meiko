@@ -716,3 +716,6 @@ svg.i.rot-up { transform: rotate(-90deg); } svg.i.rot-down { transform: rotate(9
 .att-img .att-dl { position: absolute; right: 6px; bottom: 6px; background: rgba(0,0,0,.55); color: #fff; border-radius: 8px; padding: 4px; }
 .att-dl svg { width: 16px; height: 16px; }
 img.att-full { width: 100%; height: auto; border-radius: 10px; display: block; }
+
+.fleet-sheet .fs-art { display: grid; place-items: center; padding: 4px 0 10px; } .fleet-sheet .fs-art svg { width: 160px; height: auto; }
+.fleet-sheet .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; background: var(--ok); }

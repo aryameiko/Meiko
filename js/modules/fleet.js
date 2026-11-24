@@ -268,7 +268,7 @@
       view.innerHTML = ui.pageHead(this) + '<div data-fleet-page class="fleet-page">' + setup + live +
         ui.notice('warn', '<b>Not a safety system.</b> Fleet & Chat needs internet on both sides and uses free public relays that can be slow or down. For distress and collision avoidance use VHF (Ch 16 / DSC) and AIS.') +
         ui.help('How it works and privacy', '<p>MEIKO has no server and no accounts. Messages travel through free public <b>Nostr relays</b>. Everything is encrypted with a key made from the group code, so the relays see only scrambled data. Anyone who knows the code can read the group, so share it only with people you trust.</p>' +
-          '<p>Your position is sent only while <b>Share my position</b> is on, every 30 seconds, and only while MEIKO is open. Phones pause web apps in the background, so others may see you as offline. <b>Private chat</b> (the Private button next to a vessel) is encrypted a second time with a key only your device and theirs can compute, so other group members cannot read it. Compare the <b>safety code</b> by VHF or phone to be sure you are talking to the right device. Relays and group members can still see <i>that</i> you sent a private message and when, but not to whom or what it says. Anyone who gets hold of an unlocked phone can read its messages.</p><p>Positions are not stored by the relays; recent chat (up to 2 days) is, so people who join later can read it. The last 100 messages are also kept on this device.</p><p><b>Photos and files</b> (the paperclip) are encrypted like messages (private ones end-to-end) and sent in small parts of 16 KB, because public relays refuse large messages. Photos are compressed to about 300 KB; other files can be up to 512 KB. A 300 KB photo takes about 20 parts and roughly 6–10 seconds; keep MEIKO open until it says sent. Some relays limit how fast you may send, so a large file can arrive incomplete. Received files are kept in this browser\'s storage.</p>' +
+          '<p>Your position is sent only while <b>Share my position</b> is on, every 30 seconds, and only while MEIKO is open. Phones pause web apps in the background, so others may see you as offline. <b>Private chat</b>: tap a vessel on the map or in the list, then <b>Chat</b>. No extra code is needed. It is encrypted a second time with a key only your device and theirs can compute, so other group members cannot read it. For very sensitive information you can optionally compare the number under <i>Verify</i> by VHF or phone. Relays and group members can still see <i>that</i> you sent a private message and when, but not to whom or what it says. Anyone who gets hold of an unlocked phone can read its messages.</p><p>Positions are not stored by the relays; recent chat (up to 2 days) is, so people who join later can read it. The last 100 messages are also kept on this device.</p><p><b>Photos and files</b> (the paperclip) are encrypted like messages (private ones end-to-end) and sent in small parts of 16 KB, because public relays refuse large messages. Photos are compressed to about 300 KB; other files can be up to 512 KB. A 300 KB photo takes about 20 parts and roughly 6–10 seconds; keep MEIKO open until it says sent. Some relays limit how fast you may send, so a large file can arrive incomplete. Received files are kept in this browser\'s storage.</p>' +
           '<p>Vessels show as online if they sent something in the last 3 minutes; otherwise you see when they were last seen.</p>' +
           '<label class="field"><span>Relays (advanced)</span><textarea data-relays rows="3" placeholder="' + esc(C.fleet.DEFAULT_RELAYS.join('\n')) + '">' + esc(c.relays || '') + '</textarea><small class="hint">Leave empty for the defaults. One wss:// address per line. Everyone in a group needs at least one relay in common.</small></label>') + '</div>';
 
@@ -298,7 +298,7 @@
           '<span class="dot ' + (online(p) ? 'ok' : '') + '"></span><span class="fp-main"><b>' + esc(p.name) + (p.callsign ? ' <small>' + esc(p.callsign) + '</small>' : '') + '</b>' +
           '<small>' + (p.pos ? 'COG ' + deg(p.pos.cog) + ' · SOG ' + kn(p.pos.sog) + (dist ? ' · ' + dist : '') : 'Position not shared') + '</small></span>' +
           '<small class="fp-seen">' + (p.left ? 'left · ' : '') + (online(p) ? 'online' : ago(p.at)) + '<br><span class="fp-id">ID ' + C.fleet.shortId(p.id) + '</span></small></button>' +
-          '<button type="button" class="btn btn-ghost btn-sm fp-dm" data-dm="' + esc(p.id) + '" aria-label="Private chat with ' + esc(p.name) + '">' + icon('i-lock') + 'Private' + (st.unread[p.id] ? ' <span class="badge-n">' + st.unread[p.id] + '</span>' : '') + '</button></div>';
+          '<button type="button" class="btn btn-ghost btn-sm fp-dm" data-dm="' + esc(p.id) + '" aria-label="Chat with ' + esc(p.name) + '">' + icon('i-chat') + 'Chat' + (st.unread[p.id] ? ' <span class="badge-n">' + st.unread[p.id] + '</span>' : '') + '</button></div>';
       }
       function paintPeers() {
         if (!st.client) return;
@@ -345,9 +345,9 @@
         if (dm) {
           if (st.unread[st.view]) { delete st.unread[st.view]; saveDM(); paintTabs(); paintPeers(); }
           var myPub = st.client.pubkey, code = C.fleet.safetyCode(window.MeikoNostrCrypto, myPub, st.view);
-          $('[data-dmhead]').innerHTML = '<div class="dm-head">' + icon('i-lock') + '<div><b>Private with ' + esc(peerName(st.view)) + '</b> <small>ID ' + C.fleet.shortId(st.view) + '</small>' +
-            '<small>Only your device and theirs can read these messages. Other group members cannot.</small>' +
-            '<details><summary>Safety code: <b class="sc">' + code + '</b></summary><small>Ask the other vessel (by VHF, phone or in person) to read the safety code on their screen. If it is the same, you are talking to the right device and nobody else can read it. If it differs, do not send secrets.</small></details></div></div>';
+          $('[data-dmhead]').innerHTML = '<div class="dm-head">' + icon('i-lock') + '<div><b>Chat with ' + esc(peerName(st.view)) + '</b>' +
+            '<small>Private: only you and ' + esc(peerName(st.view)) + ' can read it.</small>' +
+            '<details><summary>Verify (optional)</summary><small>For very sensitive information you can check that you are talking to the right device: both phones show the same number <b class="sc">' + code + '</b> (ID ' + C.fleet.shortId(st.view) + '). Compare it by VHF or phone.</small></details></div></div>';
           list = st.dm[st.view] || [];
           $('[data-msg]').placeholder = 'Private message to ' + peerName(st.view);
         } else { $('[data-dmhead]').innerHTML = ''; list = st.chat; $('[data-msg]').placeholder = 'Message to the whole group'; }
@@ -374,7 +374,8 @@
             : L.divIcon({ className: 'mk pm-dot fleet-dot' + (online(p) ? '' : ' stale'), iconSize: [16, 16], iconAnchor: [8, 8] });
           var tip = '<b>' + esc(p.name) + '</b> · ' + (online(p) ? 'online' : ago(p.pos.seen || p.at)) + '<br>COG ' + deg(p.pos.cog) + ' · SOG ' + kn(p.pos.sog);
           var ll = [p.pos.lat, p.pos.lon]; pts.push(ll);
-          if (!markers[p.id]) added = markers[p.id] = L.marker(ll, { icon: icon, keyboard: false }).bindTooltip(tip, { permanent: true, direction: 'top', offset: [0, -10], className: 'pm-label fleet-label' }).addTo(fm.map);
+          if (!markers[p.id]) added = markers[p.id] = L.marker(ll, { icon: icon, keyboard: false, title: p.name }).bindTooltip(tip, { permanent: true, direction: 'top', offset: [0, -10], className: 'pm-label fleet-label', interactive: true })
+            .on('click', (function (pid) { return function (e) { L.DomEvent.stop(e); vesselSheet(pid); }; })(p.id)).addTo(fm.map);
           else { markers[p.id].setLatLng(ll).setIcon(icon); markers[p.id].setTooltipContent(tip); }
         });
         Object.keys(markers).forEach(function (k) { if (!keep[k]) { fm.map.removeLayer(markers[k]); delete markers[k]; } });
@@ -451,9 +452,30 @@
         var im = e.target.closest('.att-img img'); if (im) { ui.sheet({ title: im.alt || 'Photo', html: '<img class="att-full" src="' + im.src + '" alt="">' }); return; }
         var tb = e.target.closest('[data-tab]'); if (tb) { st.view = tb.dataset.tab; paintChat(); return; }
         var d = e.target.closest('[data-dm]'); if (d) { openDM(d.dataset.dm); return; }
-        var b = e.target.closest('[data-peer]'); if (!b || !fm) return;
-        var p = st.peers[b.dataset.peer]; if (p && p.pos) { fm.map.setView([p.pos.lat, p.pos.lon], Math.max(fm.map.getZoom(), 11)); $('[data-fmap]').scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+        var b = e.target.closest('[data-peer]'); if (b) vesselSheet(b.dataset.peer);
       });
+      /** Tap a vessel (map icon or list): its data, plus Chat and Show on map. */
+      function vesselSheet(id) {
+        var p = st.peers[id]; if (!p) return;
+        var v = vesselOf(p), t = v && MEIKO.vessel.types.filter(function (x) { return x.id === v.type; })[0], rows = [];
+        rows.push(['Status', online(p) ? '<span class="dot ok"></span> online' : (p.left ? 'left the group · ' : 'last seen ') + ago(p.at)]);
+        if (t) rows.push(['Vessel type', esc(t.label)]);
+        if (p.callsign) rows.push(['Call sign', esc(p.callsign)]);
+        if (p.pos) {
+          rows.push(['Position', esc(ui.coord(p.pos.lat, 'lat')) + '<br>' + esc(ui.coord(p.pos.lon, 'lon'))]);
+          rows.push(['COG / SOG', deg(p.pos.cog) + ' · ' + kn(p.pos.sog)]);
+          var mf = st.fix || (MEIKO.gps && MEIKO.gps.last && MEIKO.gps.last());
+          if (mf && isFinite(mf.lat)) { var g = C.geo.greatCircle(mf.lat, mf.lon, p.pos.lat, p.pos.lon); rows.push(['From you', ui.num(g.distanceNM, g.distanceNM < 10 ? 2 : 1) + ' NM · ' + ui.bearing(g.initialBearing) + ' T']); }
+          rows.push(['Position time', ago(p.pos.t || p.pos.seen || p.at)]);
+        } else rows.push(['Position', 'Not shared']);
+        ui.sheet({ title: p.name, html: '<div class="fleet-sheet">' + (v ? '<div class="fs-art">' + MEIKO.vessel.side(v.type, v) + '</div>' : '') + ui.kv(rows) +
+          '<div class="actions"><button class="btn btn-primary" data-chatnow>' + icon('i-chat') + 'Chat' + (st.unread[id] ? ' <span class="badge-n">' + st.unread[id] + '</span>' : '') + '</button>' +
+          (p.pos ? '<button class="btn btn-ghost" data-mapnow>' + icon('i-map') + 'Show on map</button>' : '') + '</div></div>',
+          onMount: function (body, close) {
+            ui.$('[data-chatnow]', body).addEventListener('click', function () { close(); openDM(id); });
+            var m = ui.$('[data-mapnow]', body); if (m) m.addEventListener('click', function () { close(); if (fm) { fm.map.setView([p.pos.lat, p.pos.lon], Math.max(fm.map.getZoom(), 11)); $('[data-fmap]').scrollIntoView({ behavior: 'smooth', block: 'center' }); } });
+          } });
+      }
       paintMode();
     }
   });
