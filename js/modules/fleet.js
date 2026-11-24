@@ -67,6 +67,8 @@
   }
   function beat() {
     if (!st.client) return;
+    // Forget vessels not heard from for 6 hours (the public fleet can see many vessels in a day).
+    Object.keys(st.peers).forEach(function (k) { if (Date.now() - st.peers[k].at > 6 * 3600 * 1000) delete st.peers[k]; });
     var p = me(), c = cfg();
     p.k = 'live'; if (c.ns != null) p.ns = c.ns;
     if (c.share && st.fix && Date.now() - (st.fix.timestamp || 0) < 5 * 60 * 1000) {
@@ -87,6 +89,14 @@
   }
   function gpsOff() { if (st.gw) MEIKO.gps.stop(st.gw); st.gw = null; }
   function chatKey() { return 'fleet:chat:' + st.tag; }
+  /* Flood guard (the public fleet is open to everyone): at most 8 messages per sender in any minute; more are dropped. */
+  var FLOOD_N = 8, FLOOD_MS = 60000, sent = {};
+  function flooding(from, at) {
+    var a = (sent[from] || []).filter(function (t) { return Math.abs(t - at) < 10 * FLOOD_MS; });
+    var n = a.filter(function (t) { return Math.abs(t - at) < FLOOD_MS; }).length;
+    if (n >= FLOOD_N) { sent[from] = a; return true; }
+    a.push(at); sent[from] = a.slice(-50); return false;
+  }
   function addChat(m) {
     if (st.chat.some(function (x) { return x.id === m.id; })) return false;
     st.chat.push({ id: m.id, from: m.from, me: m.me, name: m.name, callsign: m.callsign, text: m.text, att: m.att || null, at: m.at });
@@ -116,10 +126,19 @@
   function db() {
     if (dbP) return dbP;
     dbP = new Promise(function (res, rej) {
-      try { var r = indexedDB.open('meiko-fleet', 1); r.onupgradeneeded = function () { r.result.createObjectStore('files'); }; r.onsuccess = function () { res(r.result); }; r.onerror = function () { rej(r.error); }; }
+      try { var r = indexedDB.open('meiko-fleet', 1); r.onupgradeneeded = function () { r.result.createObjectStore('files'); }; r.onsuccess = function () { res(r.result); prune(r.result); }; r.onerror = function () { rej(r.error); }; }
       catch (e) { rej(e); }
     });
     return dbP;
+  }
+  /* Relays drop chat after 3 days; drop the photos, videos and files kept on this phone after the same time, so
+     the public fleet cannot fill the phone's storage. */
+  var KEEP_FILES_MS = 3 * 86400 * 1000;
+  function prune(d) {
+    try {
+      var tx = d.transaction('files', 'readwrite'), cut = Date.now() - KEEP_FILES_MS;
+      tx.objectStore('files').openCursor().onsuccess = function (e) { var c = e.target.result; if (!c) return; if (!c.value || !(c.value.at > cut)) c.delete(); c.continue(); };
+    } catch (e) {}
   }
   function putFile(key, rec) { return db().then(function (d) { return new Promise(function (res, rej) { var tx = d.transaction('files', 'readwrite'); tx.objectStore('files').put(rec, key); tx.oncomplete = res; tx.onerror = function () { rej(tx.error); }; }); }); }
   function getFile(key) { return db().then(function (d) { return new Promise(function (res) { var q = d.transaction('files').objectStore('files').get(key); q.onsuccess = function () { res(q.result || null); }; q.onerror = function () { res(null); }; }); }, function () { return null; }); }
@@ -267,14 +286,14 @@
         emit('peers');
       },
       onChat: function (m) {
-        if (blocked(m.from) || !addChat(m)) return;
+        if (blocked(m.from) || (!m.me && st.chat.every(function (x) { return x.id !== m.id; }) && flooding(m.from, m.at)) || !addChat(m)) return;
         emit('chat');
         if (!m.me && groupOn() && Date.now() - m.at < 120000 && !document.querySelector('[data-fleet-page]')) ui.toast('💬 ' + m.name + ': ' + m.text.slice(0, 60));
       },
       onFile: onFile,
       onFileProgress: function (p) { st.prog[(p.from) + ':' + p.fid] = p.got / p.n; emit('prog'); },
       onDM: function (m) {
-        if (!st.tag || (!m.me && blocked(m.peer)) || !addDM(m)) return;
+        if (!st.tag || (!m.me && (blocked(m.peer) || ((st.dm[m.peer] || []).every(function (x) { return x.id !== m.id; }) && flooding(m.peer, m.at)))) || !addDM(m)) return;
         emit('dm');
         if (!m.me && Date.now() - m.at < 120000 && !(st.view === m.peer && document.querySelector('[data-fleet-page]'))) ui.toast('🔒 ' + peerName(m.peer) + ': ' + m.text.slice(0, 60));
       }
@@ -283,6 +302,7 @@
     return client.start().then(function (tag) {
       if (st.client !== client) return;
       st.tag = tag; st.joining = false; st.code = code;
+      if (window.indexedDB) db().catch(function () {}); // opens the file store and drops files older than 3 days
       st.chat = (MEIKO.storage.get(chatKey(), []) || []).filter(function (m) { return m && m.id && typeof m.text === 'string'; });
       loadDM();
       if (code === PUB) saveCfg({ joined: false, publicOff: false }); else saveCfg({ code: code, joined: true });
@@ -506,7 +526,7 @@
         ui.notice('warn', '<b>Not a safety system.</b> Fleet & Chat needs internet on both sides and uses free public relays that can be slow or down. For distress and collision avoidance use VHF (Ch 16 / DSC) and AIS.') +
         ui.help('How it works and privacy', '<p><b>Public fleet.</b> Everyone signed in to MEIKO joins it automatically, so vessels that are online see each other without a code. Anyone using MEIKO can see the nickname, vessel and (only if you share it) position of the vessels in it. Your position is shared by default; switch <b>Share my position</b> off to hide it. <b>General Group</b> is one chat room for everyone, no code: join it under Chat. It is not private and not moderated; tap a name to <b>Block</b> or <b>Report</b> a vessel.</p>' +
           '<p>MEIKO has no server of its own. Messages travel through free public <b>Nostr relays</b>, encrypted, so the relays see only scrambled data. In a <b>private group</b> the key is made from the group code: anyone who knows the code can read the group, so share it only with people you trust. The public fleet\'s key is public by design.</p>' +
-          '<p>Your position is sent only while <b>Share my position</b> is on, every 30 seconds, and only while MEIKO is open. Phones pause web apps in the background, so others may see you as offline. <b>Private chat</b>: tap a vessel on the map or in the list, then <b>Chat</b>. No extra code is needed. It is encrypted a second time with a key only your device and theirs can compute, so nobody else, including other vessels in the fleet, can read it. For very sensitive information you can optionally compare the number under <i>Verify</i> by VHF or phone. Relays and group members can still see <i>that</i> you sent a private message and when, but not to whom or what it says. Anyone who gets hold of an unlocked phone can read its messages.</p><p>Positions are not stored by the relays; recent chat (up to 2 days) is, so people who join later can read it. The last 100 messages are also kept on this device.</p><p><b>Photos and files</b> (the paperclip) are encrypted like messages (private ones end-to-end) and sent in small parts of 16 KB, because public relays refuse large messages. Photos are compressed to about 300 KB; other files can be up to 512 KB. A 300 KB photo takes about 20 parts and roughly 6–10 seconds; keep MEIKO open until it says sent. Some relays limit how fast you may send, so a large file can arrive incomplete. Received files are kept in this browser\'s storage.</p>' +
+          '<p>Your position is sent only while <b>Share my position</b> is on, every 30 seconds, and only while MEIKO is open. Phones pause web apps in the background, so others may see you as offline. <b>Private chat</b>: tap a vessel on the map or in the list, then <b>Chat</b>. No extra code is needed. It is encrypted a second time with a key only your device and theirs can compute, so nobody else, including other vessels in the fleet, can read it. For very sensitive information you can optionally compare the number under <i>Verify</i> by VHF or phone. Relays and group members can still see <i>that</i> you sent a private message and when, but not to whom or what it says. Anyone who gets hold of an unlocked phone can read its messages.</p><p>Positions are not stored by the relays; recent chat (up to 2 days) is, so people who join later can read it. The last 100 messages are also kept on this device.</p><p><b>Photos and files</b> (the paperclip) are encrypted like messages (private ones end-to-end) and sent in small parts of 16 KB, because public relays refuse large messages. Photos are compressed to about 300 KB; other files can be up to 512 KB. A 300 KB photo takes about 20 parts and roughly 6–10 seconds; keep MEIKO open until it says sent. Some relays limit how fast you may send, so a large file can arrive incomplete. Received files are kept in this browser\'s storage for 3 days.</p>' +
           '<p>Vessels show as online if they sent something in the last 3 minutes; otherwise you see when they were last seen.</p>' +
           '<p><button type="button" class="btn btn-ghost btn-sm" data-unblock>Unblock all vessels</button></p>' +
           '<label class="field"><span>Relays (advanced)</span><textarea data-relays rows="3" placeholder="' + esc(C.fleet.DEFAULT_RELAYS.join('\n')) + '">' + esc(c.relays || '') + '</textarea><small class="hint">Leave empty for the defaults. One wss:// address per line. Everyone in a group needs at least one relay in common.</small></label>') + '</div>';
