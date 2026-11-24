@@ -4,7 +4,7 @@
  */
 (function () {
   'use strict';
-  MEIKO.VERSION = '1.4.0';
+  MEIKO.VERSION = '1.5.0';
   var ui = MEIKO.ui, F = MEIKO.features, icon = ui.icon, C = window.MeikoCore;
   var view = ui.$('#view'), cleanup = null, clockTimer = null, deferredInstall = null;
 
@@ -93,6 +93,7 @@
         '<svg class="rose" style="color:#E9D18A"><use href="#i-compass-rose"/></svg>' +
         '<div class="hero-top"><div><div class="clock" data-clock>--:--</div><div class="date" data-date></div><div class="sub" data-utc></div></div>' +
         '<div class="tagline">' + ui.esc(MEIKO.t('tagline')) + '</div></div>' +
+        (MEIKO.vessel ? MEIKO.vessel.heroHTML() : '') +
         '<div class="pos" data-pos></div>' +
       '</section>' +
       '<div class="search">' + icon('i-search') + '<input type="search" placeholder="Search tools — e.g. ETA, qibla, knots, sunrise" aria-label="Search tools" data-search></div>' +

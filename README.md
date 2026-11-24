@@ -88,6 +88,15 @@ The Track planner is the `track` tool in Navigation, which is also the Map's **T
   - Saved tracks are stored on the device under `tracks`, and the track being edited is kept as a draft under `track:draft`. Both work offline.
   - GPX 1.1 export uses `<rte>`. GPX import reads routes, tracks (thinned to 500 points) and waypoints.
 
+## My Vessel (v1.5)
+
+The vessel avatar is in `js/modules/vessel.js`, in the Settings category. Users choose from 8 vessel types: sailboat, pinisi, speedboat, passenger ship, container ship, tanker, fishing boat and tug. The drawings are original flat SVGs in two views: a side profile and a top view used as the map marker.
+
+- **Customising:** hull, superstructure or sails, and accent colours, from a palette or a custom colour picker. Users also set a name, and optionally a call sign and home port.
+- **Storage:** saved on the device only, under the storage key `vessel`.
+- **Dashboard:** the hero shows the avatar and name, or a "Create your vessel" link if none is set.
+- **Map:** the vessel is the own-ship GPS marker, rotated to course over ground when the fix has a heading and the speed is above 0.5 m/s. Otherwise it shows a side-view badge.
+
 ## Accuracy & data status
 
 - **Port coordinates: sample / unverified.** Approximate harbour positions; each record has `verified: false`. Verify against official charts / port authority data, then set `verified: true` and `source`.

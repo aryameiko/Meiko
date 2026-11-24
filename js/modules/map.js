@@ -172,15 +172,24 @@
 
     // GPS fix
     var gpsMarker = null, gpsCircle = null;
+    /* Own-ship marker: the user's vessel avatar (rotated to course over ground when moving) or a blue dot. */
+    function gpsIcon(f) {
+      var v = MEIKO.vessel && MEIKO.vessel.get();
+      if (!v || !v.showOnMap) return dot(L, 'mk-gps', '', 18);
+      var moving = f.speed == null || f.speed > 0.5; // m/s; heading is meaningless when stopped
+      var hdg = f.heading != null && isFinite(f.heading) && moving ? f.heading : null;
+      return L.divIcon({ className: 'mk vsl-mk', html: MEIKO.vessel.markerHTML(v, hdg), iconSize: hdg != null ? [28, 56] : [52, 32], iconAnchor: hdg != null ? [14, 28] : [26, 16] });
+    }
     function showFix(f, fly) {
       var ll = [f.lat, f.lon];
       if (!gpsMarker) {
         gpsCircle = L.circle(ll, { radius: f.accuracy || 0, className: 'gps-acc', interactive: false }).addTo(map);
-        gpsMarker = L.marker(ll, { icon: dot(L, 'mk-gps', '', 18), zIndexOffset: 1000, keyboard: false }).addTo(map)
+        gpsMarker = L.marker(ll, { icon: gpsIcon(f), zIndexOffset: 1000, keyboard: false }).addTo(map)
           .on('click', function (e) { L.DomEvent.stop(e); if (opts.onPick) opts.onPick(gpsMarker.getLatLng().lat, gpsMarker.getLatLng().lng, 'GPS position'); });
-      } else { gpsMarker.setLatLng(ll); gpsCircle.setLatLng(ll); }
+      } else { gpsMarker.setLatLng(ll); gpsCircle.setLatLng(ll); gpsMarker.setIcon(gpsIcon(f)); }
       gpsCircle.setRadius(f.accuracy || 0);
-      gpsMarker.bindTooltip('GPS' + (f.sourceLabel ? ' · ' + esc(f.sourceLabel) : '') + (f.accuracy != null ? ' · ±' + Math.round(f.accuracy) + ' m' : ''), { direction: 'top', offset: [0, -8] });
+      var vs = MEIKO.vessel && MEIKO.vessel.get();
+      gpsMarker.bindTooltip((vs && vs.showOnMap && vs.name ? '<b>' + esc(vs.name) + '</b> · ' : '') + 'GPS' + (f.sourceLabel ? ' · ' + esc(f.sourceLabel) : '') + (f.accuracy != null ? ' · ±' + Math.round(f.accuracy) + ' m' : ''), { direction: 'top', offset: [0, -8] });
       if (fly) map.setView(ll, Math.max(map.getZoom(), f.accuracy && f.accuracy > 2000 ? 11 : 15));
     }
     var onFix = function (f) { if (alive) showFix(f, false); };
