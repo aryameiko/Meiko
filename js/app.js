@@ -4,7 +4,7 @@
  */
 (function () {
   'use strict';
-  MEIKO.VERSION = '1.6.0';
+  MEIKO.VERSION = '1.6.1';
   var ui = MEIKO.ui, F = MEIKO.features, icon = ui.icon, C = window.MeikoCore;
   var view = ui.$('#view'), cleanup = null, clockTimer = null, deferredInstall = null;
 
@@ -158,7 +158,7 @@
     view.innerHTML = '<div class="page-head"><div class="eyebrow">Category</div><h1>' + ui.esc(MEIKO.t('cat.' + catId)) + '</h1><p>' + ui.esc(cat.desc) + '.</p></div>' +
       '<div class="tool-list">' + tools.map(function (t) {
         return '<a class="cat" href="#/t/' + t.id + '"><div class="ico">' + icon(t.icon) + '</div><div class="txt"><b>' + ui.esc(t.title) + '</b><small>' + ui.esc(t.desc) + '</small></div>' + icon('i-chev', 'chev') + '</a>';
-      }).join('') + '</div>' + (catId === 'navigation' ? ui.disclaimer() : '');
+      }).join('') + '</div>' + (catId === 'navigation' || catId === 'calculator' ? ui.disclaimer() : '');
   }
 
   /* ---------- Shared dialogs ---------- */

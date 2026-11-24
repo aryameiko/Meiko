@@ -5,7 +5,7 @@
   'use strict';
   var C = window.MeikoCore, ui = MEIKO.ui;
   MEIKO.features.register({
-    id: 'calculator', cat: 'calculator', icon: 'i-calc', title: 'Calculator',
+    id: 'calculator', cat: 'calculator', order: 1, icon: 'i-calc', title: 'Calculator',
     desc: 'Add, subtract, multiply, divide and percentages', keywords: 'kalkulator arithmetic percent math',
     render: function (view) {
       view.innerHTML = ui.pageHead(this) +

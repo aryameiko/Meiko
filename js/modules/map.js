@@ -557,7 +557,7 @@
     render: function (view) { return renderMap(view, this, 'pick'); }
   });
   MEIKO.features.register({
-    id: 'track', cat: 'navigation', icon: 'i-route', title: 'Track Planner',
+    id: 'track', cat: 'navigation', order: 1, icon: 'i-route', title: 'Track Planner',
     desc: 'Waypoints on the map: course (T/M), distance, ETA per leg; save, GPX',
     keywords: 'track trek rute route waypoint way point titik belok turning point baringan bearing haluan course jarak distance gpx plan passage pelayaran',
     lead: 'Tap the map to add turning points in order. Each leg shows true and magnetic course, distance and ETA. Tracks are saved on this device and work offline.',

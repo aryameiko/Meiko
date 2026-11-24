@@ -7,8 +7,8 @@
   'use strict';
   var tools = [], byId = {};
   var CATEGORIES = [
-    { id: 'navigation', icon: 'i-nav', desc: 'Distance, ports, rhumb line, course, ETA, coordinates' },
-    { id: 'calculator', icon: 'i-calc', desc: 'Everyday arithmetic with percentages' },
+    { id: 'navigation', icon: 'i-nav', desc: 'Track planner, course & bearing, port to port' },
+    { id: 'calculator', icon: 'i-calc', desc: 'Calculator, distance, rhumb line, ETA, speed/distance/time, coordinates' },
     { id: 'converter', icon: 'i-convert', desc: 'Maritime, speed, length, time, angle, temperature' },
     { id: 'astronomy', icon: 'i-sun', desc: 'Meridian passage, sunrise and sunset' },
     { id: 'prayer', icon: 'i-moon', desc: 'Maghrib time and Qibla direction' },
@@ -29,7 +29,10 @@
     },
     all: function () { return tools.slice(); },
     get: function (id) { return byId[id]; },
-    inCategory: function (cat) { return tools.filter(function (t) { return t.cat === cat; }); },
+    inCategory: function (cat) {
+      return tools.map(function (t, i) { return { t: t, i: i }; }).filter(function (x) { return x.t.cat === cat; })
+        .sort(function (a, b) { return ((a.t.order || 99) - (b.t.order || 99)) || (a.i - b.i); }).map(function (x) { return x.t; });
+    },
     category: function (id) { return CATEGORIES.filter(function (c) { return c.id === id; })[0]; },
     search: function (q) {
       q = String(q || '').trim().toLowerCase(); if (!q) return [];

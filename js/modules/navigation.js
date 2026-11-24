@@ -53,7 +53,7 @@
 
   /* ======================= A. Distance ======================= */
   reg({
-    id: 'distance', cat: 'navigation', icon: 'i-ruler', title: 'Distance Calculator',
+    id: 'distance', cat: 'calculator', order: 2, icon: 'i-ruler', title: 'Distance Calculator',
     desc: 'Great circle distance and bearings between two positions', keywords: 'great circle haversine bearing nm km',
     lead: 'Great circle distance with initial and final true bearings between two coordinates.',
     render: function (view) {
@@ -98,7 +98,7 @@
 
   /* ======================= B. Port to port ======================= */
   reg({
-    id: 'ports', cat: 'navigation', icon: 'i-anchor', title: 'Port-to-Port',
+    id: 'ports', cat: 'navigation', order: 3, icon: 'i-anchor', title: 'Port-to-Port',
     desc: 'Straight-line distance and bearings between ports', keywords: 'harbour harbor pelabuhan priok perak belawan makassar',
     lead: 'Choose a departure and destination port from the sample Indonesian port list.',
     render: function (view) {
@@ -157,7 +157,7 @@
 
   /* ======================= C. Rhumb line ======================= */
   reg({
-    id: 'rhumb', cat: 'navigation', icon: 'i-route', title: 'Rhumb Line',
+    id: 'rhumb', cat: 'calculator', order: 3, icon: 'i-route', title: 'Rhumb Line',
     desc: 'Constant-course distance compared with great circle', keywords: 'loxodrome mercator constant course',
     lead: 'Rhumb line (constant true course) distance and bearing, with the great circle distance for comparison.',
     render: function (view) {
@@ -195,7 +195,7 @@
 
   /* ======================= D. Course & bearing ======================= */
   reg({
-    id: 'course', cat: 'navigation', icon: 'i-course', title: 'Course & Bearing',
+    id: 'course', cat: 'navigation', order: 2, icon: 'i-course', title: 'Course & Bearing',
     desc: 'True course, final bearing and reciprocal', keywords: 'heading direction azimuth reciprocal',
     lead: 'Course to steer (true, 000°–360°) from one position to another.',
     render: function (view) {
@@ -231,7 +231,7 @@
 
   /* ======================= E. ETA ======================= */
   reg({
-    id: 'eta', cat: 'navigation', icon: 'i-clock', title: 'ETA Calculator',
+    id: 'eta', cat: 'calculator', order: 4, icon: 'i-clock', title: 'ETA Calculator',
     desc: 'Estimated time of arrival from distance and speed', keywords: 'arrival time passage voyage',
     lead: 'Time = Distance ÷ Speed. Enter departure, distance and speed to get the estimated arrival.',
     render: function (view) {
@@ -290,7 +290,7 @@
 
   /* ======================= F. Speed / distance / time ======================= */
   reg({
-    id: 'dst', cat: 'navigation', icon: 'i-gauge', title: 'Speed · Distance · Time',
+    id: 'dst', cat: 'calculator', order: 5, icon: 'i-gauge', title: 'Speed · Distance · Time',
     desc: 'Solve D = S × T for any one value', keywords: 'speed distance time knots formula navigation calculator',
     lead: 'Solve for distance, speed or time. Maritime units by default.',
     render: function (view) {
@@ -348,7 +348,7 @@
 
   /* ======================= G. Coordinate converter ======================= */
   reg({
-    id: 'coords', cat: 'navigation', icon: 'i-grid', title: 'Coordinate Converter',
+    id: 'coords', cat: 'calculator', order: 6, icon: 'i-grid', title: 'Coordinate Converter',
     desc: 'Convert between DD, DDM and DMS', keywords: 'latitude longitude format degrees minutes seconds dms ddm lintang bujur',
     lead: 'Type a latitude and longitude in any format — decimal degrees, degrees & decimal minutes, or degrees minutes seconds.',
     render: function (view) {
