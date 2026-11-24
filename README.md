@@ -68,6 +68,26 @@ External accuracy is estimated as HDOP × 5 m. Checksums are verified; bad sente
 - **Provider hook:** `MEIKO.map.addBaseLayer({ id, label, create(L) })` adds another base layer, for example Google Map Tiles once a key exists.
 - **Terms:** check the Esri imagery and OSM tile terms before commercial or high-traffic use. Self-hosted or paid tiles may be needed then.
 
+## Track planner (v1.4)
+
+The Track planner is the `track` tool in Navigation, which is also the Map's **Track** mode. The UI is in `js/modules/track.js` and the maths and GPX handling are in `js/core/track.js`.
+
+- **Waypoints:**
+  - Add them by tapping the map, typing coordinates, using the GPS fix, or with "Add to track" from Pick point.
+  - Drag them on the map.
+  - Rename, edit, move up or down, insert, delete, or reverse the order.
+- **Per leg:**
+  - Shows the true course, magnetic course, distance, time and ETA from speed and departure.
+  - Legs are rhumb lines (constant course, the default) or great circles, which show the initial and final course.
+  - Leg labels are drawn on the map.
+- **Magnetic variation:**
+  - By default it comes from the World Magnetic Model 2025 (`js/core/wmm.js`, NOAA/BGS coefficients, valid 2025–2029). It is checked against the official WMM2025 test values to within 0.005°.
+  - It can also be entered by hand from a chart.
+  - Deviation and local anomalies are not included.
+- **Storage:**
+  - Saved tracks are stored on the device under `tracks`, and the track being edited is kept as a draft under `track:draft`. Both work offline.
+  - GPX 1.1 export uses `<rte>`. GPX import reads routes, tracks (thinned to 500 points) and waypoints.
+
 ## Accuracy & data status
 
 - **Port coordinates: sample / unverified.** Approximate harbour positions; each record has `verified: false`. Verify against official charts / port authority data, then set `verified: true` and `source`.

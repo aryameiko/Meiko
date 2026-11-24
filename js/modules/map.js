@@ -5,7 +5,7 @@
  *    place-name overlay. Nautical overlay: OpenSeaMap seamarks.
  *  - Tap the map to pick a point → coordinates in DD / DDM / DMS, copy, save, open in Google Maps /
  *    Google Earth, or send it to a tool (Distance, Course, Qibla, Sunrise…).
- *  - Route mode: tap several points to draw a route; each leg shows great-circle distance and course.
+ *  - Track mode (also registered as the 'track' tool): waypoint routes, see js/modules/track.js.
  *  - GPS: shows the current fix (phone or external receiver) with its accuracy circle.
  *  - MEIKO.map.pick(opts, cb) opens a map in a sheet; used by the "Map" chip on every coordinate field.
  *
@@ -446,36 +446,33 @@
     drawRects(); render();
   }
 
-  /* ---------- Map page ---------- */
-  MEIKO.features.register({
-    id: 'map', cat: 'position', icon: 'i-map', title: 'Map',
-    desc: 'Pick a point on the map, satellite view, sea marks, routes',
-    keywords: 'peta map satellite satelit google maps earth openstreetmap openseamap pick point titik route rute waypoint chart',
-    lead: 'Tap anywhere to read its coordinates and use them in any tool. Street map, satellite imagery and OpenSeaMap sea marks; no account needed.',
-    render: function (view) {
+  /* ---------- Map page (also the Track planner) ---------- */
+  function renderMap(view, feature, startMode) {
       var v = getView();
-      view.innerHTML = ui.pageHead({ cat: 'position', title: 'Map', lead: this.lead }) +
+      view.innerHTML = ui.pageHead({ cat: feature.cat, title: feature.title, lead: feature.lead }) +
         '<div data-offline>' + offlineNote() + '</div>' +
         '<div class="card map-card">' + layerBar(v) +
         '<div class="map-bar map-bar-2">' +
-          '<div class="seg seg-sm" data-mode><button type="button" data-v="pick" class="on">' + icon('i-pin') + 'Pick point</button><button type="button" data-v="route">' + icon('i-route') + 'Route</button></div>' +
+          '<div class="seg seg-sm" data-mode><button type="button" data-v="pick">' + icon('i-pin') + 'Pick point</button><button type="button" data-v="route">' + icon('i-route') + 'Track</button></div>' +
           '<form class="map-go" data-go novalidate><input data-go-in placeholder="Go to: -6.104, 106.88" aria-label="Go to coordinates" autocomplete="off" spellcheck="false"><button class="icon-btn" aria-label="Go">' + icon('i-search') + '</button></form>' +
         '</div>' +
         '<div class="map-box map-main" data-mapel></div></div>' +
         '<div class="tool-grid mt-12"><div class="stack"><div class="card card-pad" data-panel></div></div>' +
         '<div class="results-col stack"><div class="card card-pad" data-offline-card></div><div class="card card-pad small" data-about></div></div></div>';
 
-      var panel = ui.$('[data-panel]', view), mode = 'pick', route = [], routeLine = null, routeMarkers = null, sel = null;
+      var panel = ui.$('[data-panel]', view), mode = null, sel = null, trk = null;
 
       function renderIdle() {
         panel.innerHTML = '<div class="card-title">' + icon('i-pin') + 'Selected point</div><p class="small muted">Tap the map, a saved place, a port or your GPS dot to select it.</p>';
       }
+      function shortName(name) { return name && name.length <= 40 ? name : ''; }
       function renderPoint(lat, lon, name) {
         sel = { lat: lat, lon: lon, name: name };
         panel.innerHTML = pointHTML(lat, lon, name) +
           '<div class="flex mt-12">' +
           '<button class="btn btn-ghost btn-sm" data-cp>' + icon('i-copy') + 'Copy</button>' +
           '<button class="btn btn-ghost btn-sm" data-save>' + icon('i-star') + 'Save</button>' +
+          '<button class="btn btn-ghost btn-sm" data-to-track>' + icon('i-route') + 'Add to track</button>' +
           '<a class="btn btn-ghost btn-sm" target="_blank" rel="noopener" href="' + googleMapsUrl(lat, lon) + '">' + icon('i-pin') + 'Google Maps</a>' +
           '<a class="btn btn-ghost btn-sm" target="_blank" rel="noopener" href="' + googleEarthUrl(lat, lon) + '">' + icon('i-nav') + 'Google Earth</a>' +
           '</div>' +
@@ -484,51 +481,15 @@
           '</select><button class="btn btn-primary btn-sm" data-send>' + icon('i-chev') + 'Open</button></div></label>';
         ui.$('[data-cp]', panel).addEventListener('click', function () { ui.copy(fx(lat) + ', ' + fx(lon), 'Coordinates copied'); });
         ui.$('[data-save]', panel).addEventListener('click', function () { MEIKO.app.promptSave(lat, lon, function () { ctl.refreshRefs(); }); });
+        ui.$('[data-to-track]', panel).addEventListener('click', function () { setMode('route'); trk.add(lat, lon, shortName(name)); });
         ui.$('[data-send]', panel).addEventListener('click', function () {
           var t = TARGETS[+ui.$('[data-target]', panel).value]; if (t) sendToTool(t[0], t[1], lat, lon);
         });
       }
 
-      function renderRoute() {
-        var L = ctl.L;
-        if (routeLine) routeLine.remove(); if (routeMarkers) routeMarkers.remove();
-        routeMarkers = L.layerGroup().addTo(ctl.map);
-        route.forEach(function (p, i) { L.marker([p.lat, p.lon], { icon: dot(L, 'mk-wp', String(i + 1), 22), keyboard: false }).addTo(routeMarkers); });
-        // Draw each leg as a densified great circle so long legs look right.
-        var pts = [];
-        for (var i = 1; i < route.length; i++) pts = pts.concat(gcPoints(route[i - 1], route[i]));
-        routeLine = route.length > 1 ? L.polyline(pts, { className: 'route-line', weight: 3 }).addTo(ctl.map) : null;
-        var total = 0, rows = '';
-        for (var j = 1; j < route.length; j++) {
-          var a = route[j - 1], b = route[j];
-          var d = C.geo.haversine(a.lat, a.lon, b.lat, b.lon), brg = C.geo.initialBearing(a.lat, a.lon, b.lat, b.lon);
-          total += d;
-          rows += '<li><div class="grow"><b>Leg ' + j + ' · ' + j + ' → ' + (j + 1) + '</b><small>Initial course ' + ui.bearing(brg) + '</small></div><b>' + dist(d) + '</b></li>';
-        }
-        panel.innerHTML = '<div class="card-title">' + icon('i-route') + 'Route<span class="spacer"></span>' +
-          (route.length ? '<button class="btn btn-ghost btn-sm" data-undo>' + icon('i-back') + 'Undo</button><button class="btn btn-ghost btn-sm" data-clr>' + icon('i-trash') + 'Clear</button>' : '') + '</div>' +
-          (!route.length ? '<p class="small muted">Tap the map to add waypoints. Each leg shows the great-circle distance and initial course.</p>' :
-            ui.big('Total · ' + route.length + ' waypoint' + (route.length > 1 ? 's' : ''), dist(total)) +
-            (rows ? '<ul class="list small mt-12">' + rows + '</ul>' : '<p class="small muted mt-12">Tap the next point.</p>') +
-            '<div class="flex mt-12"><button class="btn btn-ghost btn-sm" data-cp-route>' + icon('i-copy') + 'Copy waypoints</button>' +
-            (route.length >= 2 ? '<button class="btn btn-ghost btn-sm" data-to-dist>' + icon('i-nav') + 'First → last in Distance</button>' : '') + '</div>' +
-            '<p class="small muted mt-12">Great circle on a sphere. Check against official charts before navigating.</p>');
-        var u = ui.$('[data-undo]', panel); if (u) u.addEventListener('click', function () { route.pop(); renderRoute(); });
-        var c = ui.$('[data-clr]', panel); if (c) c.addEventListener('click', function () { route = []; renderRoute(); });
-        var cr = ui.$('[data-cp-route]', panel); if (cr) cr.addEventListener('click', function () {
-          ui.copy(route.map(function (p, i) { return (i + 1) + '\t' + fx(p.lat) + ', ' + fx(p.lon); }).join('\n') + '\nTotal: ' + dist(total), 'Waypoints copied');
-        });
-        var td = ui.$('[data-to-dist]', panel); if (td) td.addEventListener('click', function () {
-          var a = route[0], b = route[route.length - 1];
-          var data = MEIKO.storage.get('form:distance', {}) || {};
-          data['a-lat'] = fx(a.lat); data['a-lon'] = fx(a.lon); data['b-lat'] = fx(b.lat); data['b-lon'] = fx(b.lon);
-          MEIKO.storage.set('form:distance', data); location.hash = '#/t/distance';
-        });
-      }
-
       var ctl = create(ui.$('[data-mapel]', view), {
         onPick: function (lat, lon, name) {
-          if (mode === 'route') { route.push({ lat: lat, lon: lon }); renderRoute(); return; }
+          if (mode === 'route') { trk.add(lat, lon, shortName(name)); return; }
           ctl.setPick(lat, lon); renderPoint(lat, lon, name);
         },
         onTileError: function () {
@@ -538,17 +499,19 @@
       });
       if (!ctl) return;
       bindLayerBar(view, ctl, locErr);
-      renderIdle();
+      trk = MEIKO.trackUI.attach(ctl, panel);
       offlineCard(view, ctl);
 
       var modeSeg = ui.$('[data-mode]', view);
-      modeSeg.addEventListener('click', function (e) {
-        var b = e.target.closest('[data-v]'); if (!b) return;
-        ui.$$('button', modeSeg).forEach(function (x) { x.classList.toggle('on', x === b); });
-        mode = b.dataset.v;
-        if (mode === 'route') { ctl.clearPick(); renderRoute(); }
-        else { if (routeLine) routeLine.remove(); if (routeMarkers) routeMarkers.remove(); routeLine = routeMarkers = null; if (sel) { ctl.setPick(sel.lat, sel.lon); renderPoint(sel.lat, sel.lon, sel.name); } else renderIdle(); }
-      });
+      function setMode(m) {
+        if (m === mode) return;
+        mode = m;
+        ui.$$('button', modeSeg).forEach(function (x) { x.classList.toggle('on', x.dataset.v === m); });
+        if (m === 'route') { ctl.clearPick(); trk.show(); }
+        else { trk.hide(); if (sel) { ctl.setPick(sel.lat, sel.lon); renderPoint(sel.lat, sel.lon, sel.name); } else renderIdle(); }
+      }
+      modeSeg.addEventListener('click', function (e) { var b = e.target.closest('[data-v]'); if (b) setMode(b.dataset.v); });
+      setMode(startMode);
 
       ui.$('[data-go]', view).addEventListener('submit', function (e) {
         e.preventDefault();
@@ -556,7 +519,7 @@
         if (!r) return;
         if (!r.ok) return ui.toast(r.error);
         ctl.goTo(r.lat, r.lon, 13);
-        if (mode === 'route') { route.push({ lat: r.lat, lon: r.lon }); renderRoute(); }
+        if (mode === 'route') trk.add(r.lat, r.lon);
         else { ctl.setPick(r.lat, r.lon); renderPoint(r.lat, r.lon); }
       });
 
@@ -574,7 +537,21 @@
       var onNet = function () { var o = ui.$('[data-offline]', view); if (o) o.innerHTML = offlineNote(); };
       window.addEventListener('online', onNet); window.addEventListener('offline', onNet);
       return function () { window.removeEventListener('online', onNet); window.removeEventListener('offline', onNet); ctl.destroy(); };
-    }
+  }
+
+  MEIKO.features.register({
+    id: 'map', cat: 'position', icon: 'i-map', title: 'Map',
+    desc: 'Pick a point on the map, satellite view, sea marks, tracks',
+    keywords: 'peta map satellite satelit google maps earth openstreetmap openseamap pick point titik chart',
+    lead: 'Tap anywhere to read its coordinates and use them in any tool. Street map, satellite imagery and OpenSeaMap sea marks; no account needed.',
+    render: function (view) { return renderMap(view, this, 'pick'); }
+  });
+  MEIKO.features.register({
+    id: 'track', cat: 'navigation', icon: 'i-route', title: 'Track Planner',
+    desc: 'Waypoints on the map: course (T/M), distance, ETA per leg; save, GPX',
+    keywords: 'track trek rute route waypoint way point titik belok turning point baringan bearing haluan course jarak distance gpx plan passage pelayaran',
+    lead: 'Tap the map to add turning points in order. Each leg shows true and magnetic course, distance and ETA. Tracks are saved on this device and work offline.',
+    render: function (view) { return renderMap(view, this, 'route'); }
   });
 
   /** Points along the great circle a→b (for drawing), split at the antimeridian by Leaflet's worldCopyJump. */
@@ -599,7 +576,7 @@
   }
 
   MEIKO.map = {
-    create: create, pick: pick, addBaseLayer: addBaseLayer, parsePair: parsePair,
+    create: create, pick: pick, addBaseLayer: addBaseLayer, parsePair: parsePair, gcPoints: gcPoints,
     googleMapsUrl: googleMapsUrl, googleEarthUrl: googleEarthUrl
   };
 })();

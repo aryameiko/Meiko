@@ -375,5 +375,48 @@ test('Signal K: hello message and out-of-range positions are ignored', function 
   assert.strictEqual(nmea.signalKFix(st), null);
 });
 
+/* ---------- Tracks & magnetic variation ---------- */
+var track = core('track');
+global.self = global.self || {}; require(path.join(__dirname, '..', 'js', 'core', 'wmm.js'));
+var wmm = global.self.MeikoCore.wmm;
+test('WMM2025: official NOAA test values (2025.0: 89N 121W 28 km D=−99.77°; 43N 93E 65 km D=0.50°)', function () {
+  near(wmm.declination(89, -121, new Date(Date.UTC(2025, 0, 1)), 28), -99.77, 0.01);
+  near(wmm.declination(43, 93, new Date(Date.UTC(2025, 0, 1)), 65), 0.50, 0.01);
+});
+test('Track legs: rhumb course/distance, totals, ETA from speed', function () {
+  var pts = [{ lat: 0, lon: 0 }, { lat: 0, lon: 1 }, { lat: 1, lon: 1 }];
+  var r = track.legs(pts, { type: 'rhumb', speedKn: 10, departMs: 0, variation: 2 });
+  assert.strictEqual(r.legs.length, 2);
+  near(r.legs[0].courseT, 90, 1e-9); near(r.legs[0].courseM, 88, 1e-9);
+  near(r.legs[1].courseT, 0, 1e-9); near(r.legs[1].courseM, 358, 1e-9);
+  near(r.legs[0].distNM, 60.04, 0.01); near(r.totalNM, 120.08, 0.02);
+  near(r.totalH, r.totalNM / 10, 1e-12); near(r.arriveMs, r.totalH * 3600000, 1e-3);
+  near(r.legs[0].etaMs, r.legs[0].hours * 3600000, 1e-3);
+});
+test('Track legs: great circle gives initial and final course; variation function per leg', function () {
+  var r = track.legs([{ lat: -6.1, lon: 106.88 }, { lat: 21.4225, lon: 39.8262 }], { type: 'gc', variation: function (lat) { return lat < 0 ? -1 : 1; } });
+  near(r.legs[0].courseT, geo.initialBearing(-6.1, 106.88, 21.4225, 39.8262), 1e-9);
+  assert.ok(r.legs[0].finalT != null); near(r.legs[0].variation, -1, 0); assert.strictEqual(r.totalH, null);
+});
+test('Track legs: invalid waypoint rejected', function () {
+  assert.throws(function () { track.legs([{ lat: 0, lon: 0 }, { lat: 95, lon: 0 }]); }, /Waypoint 2/);
+});
+test('GPX: export then import round-trips names and positions', function () {
+  var t = { name: 'Priok → Merak <test> & co', points: [{ lat: -6.104167, lon: 106.88, name: 'Start' }, { lat: -5.93, lon: 106.0, name: '' }] };
+  var x = track.toGPX(t);
+  assert.ok(/<rte>/.test(x) && /&lt;test&gt; &amp; co/.test(x));
+  var back = track.parseGPX(x);
+  assert.strictEqual(back.length, 1); assert.strictEqual(back[0].name, t.name);
+  assert.strictEqual(back[0].points.length, 2); near(back[0].points[0].lat, -6.104167, 1e-7); assert.strictEqual(back[0].points[1].name, 'WP2');
+});
+test('GPX: reads trk/trkpt and loose wpt, rejects non-GPX', function () {
+  var g = '<?xml version="1.0"?><gpx><trk><name>Log</name><trkseg><trkpt lat="1.5" lon="103.8"><ele>0</ele></trkpt><trkpt lat=\'1.6\' lon=\'103.9\'/></trkseg></trk></gpx>';
+  var r = track.parseGPX(g); assert.strictEqual(r[0].name, 'Log'); assert.strictEqual(r[0].points.length, 2); near(r[0].points[1].lon, 103.9, 0);
+  var w = track.parseGPX('<gpx><wpt lat="-8" lon="115"><name>Bali</name></wpt><wpt lat="999" lon="0"/></gpx>');
+  assert.strictEqual(w[0].points.length, 1); assert.strictEqual(w[0].points[0].name, 'Bali');
+  assert.throws(function () { track.parseGPX('<kml></kml>'); }, /not a GPX/);
+  assert.strictEqual(track.thin(r[0].points.concat(r[0].points, r[0].points), 3).length, 3);
+});
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed\n');
 process.exit(failed ? 1 : 0);

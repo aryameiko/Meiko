@@ -4,7 +4,7 @@
  */
 (function () {
   'use strict';
-  MEIKO.VERSION = '1.3.0';
+  MEIKO.VERSION = '1.4.0';
   var ui = MEIKO.ui, F = MEIKO.features, icon = ui.icon, C = window.MeikoCore;
   var view = ui.$('#view'), cleanup = null, clockTimer = null, deferredInstall = null;
 
@@ -80,7 +80,7 @@
   });
 
   /* ---------- Dashboard ---------- */
-  var QUICK = ['map', 'distance', 'ports', 'eta', 'course', 'qibla', 'maghrib', 'merpass'];
+  var QUICK = ['map', 'track', 'distance', 'ports', 'eta', 'course', 'qibla', 'maghrib'];
   function tile(t) { return '<a class="tile" href="#/t/' + t.id + '"><div class="ico">' + icon(t.icon) + '</div><b>' + ui.esc(t.title) + '</b><span>' + ui.esc(t.desc) + '</span></a>'; }
 
   function renderHome() {
