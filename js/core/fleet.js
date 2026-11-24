@@ -21,6 +21,7 @@
   var DEFAULT_RELAYS = ['wss://relay.damus.io', 'wss://nos.lol', 'wss://relay.primal.net', 'wss://offchain.pub'];
   var CHAT_TTL_S = 3 * 86400, HISTORY_S = 2 * 86400;
   var VESSEL_TYPES = ['sailboat', 'pinisi', 'speedboat', 'passenger', 'cargo', 'tanker', 'fishing', 'tug'];
+  var CHUNK = 16000, MAX_FILE = 512 * 1024, MAX_PARTS = Math.ceil(MAX_FILE / CHUNK);
   var CODE_ALPHA = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
   function normCode(code) { return String(code || '').trim().toUpperCase().replace(/\s+/g, ''); }
@@ -101,17 +102,35 @@
   function sanitize(p) {
     if (!p || typeof p !== 'object') return null;
     var k = p.k;
-    if (k !== 'live' && k !== 'chat' && k !== 'bye' && k !== 'dm') return null;
-    if (k === 'dm') return typeof p.c === 'string' && p.c.length < 4000 ? { k: 'dm', c: p.c } : null;
+    if (k !== 'live' && k !== 'chat' && k !== 'bye' && k !== 'dm' && k !== 'part') return null;
+    if (k === 'dm') return typeof p.c === 'string' && p.c.length < 120000 ? { k: 'dm', c: p.c } : null;
+    if (k === 'part') return sanitizePart(p);
     var out = { k: k, name: str(p.name, 40) || 'Unnamed vessel', callsign: str(p.callsign, 16) };
     var v = p.v && typeof p.v === 'object' ? p.v : null;
     out.vessel = v && VESSEL_TYPES.indexOf(v.type) >= 0 ? { type: v.type, h: colour(v.h), s: colour(v.s), a: colour(v.a) } : null;
-    if (k === 'chat') { out.text = str(p.text, 500); if (!out.text) return null; }
+    if (k === 'chat') { out.text = str(p.text, 500); out.att = sanitizeAtt(p.att); if (!out.text && !out.att) return null; }
     if (k === 'live' && p.pos && typeof p.pos === 'object') {
       var lat = num(p.pos.lat, -90, 90), lon = num(p.pos.lon, -180, 180);
       if (lat != null && lon != null) out.pos = { lat: lat, lon: lon, cog: num(p.pos.cog, 0, 360), sog: num(p.pos.sog, 0, 99), t: num(p.pos.t, 0, 1e13), acc: num(p.pos.acc, 0, 1e6) };
     }
     return out;
+  }
+
+  function sanitizeAtt(a) {
+    if (!a || typeof a !== 'object') return null;
+    if (typeof a.fid !== 'string' || !/^[0-9a-f]{16}$/.test(a.fid)) return null;
+    var size = num(a.size, 1, MAX_FILE), n = num(a.n, 1, MAX_PARTS);
+    if (size == null || n == null || size % 1 || n !== Math.ceil(size / CHUNK)) return null;
+    var mime = typeof a.mime === 'string' && /^[a-z0-9.+-]{1,40}\/[a-z0-9.+-]{1,60}$/i.test(a.mime) ? a.mime.toLowerCase() : 'application/octet-stream';
+    var name = str(a.name, 80).replace(/[\\/:*?"<>|]/g, '_') || 'file';
+    var w = num(a.w, 1, 10000), h = num(a.h, 1, 10000);
+    return { fid: a.fid, name: name, mime: mime, size: size, n: n, w: w, h: h };
+  }
+  function sanitizePart(p) {
+    if (typeof p.fid !== 'string' || !/^[0-9a-f]{16}$/.test(p.fid)) return null;
+    var i = num(p.i, 0, MAX_PARTS - 1);
+    if (i == null || i % 1 || typeof p.d !== 'string' || p.d.length > 22000 || !/^[A-Za-z0-9+/=]*$/.test(p.d)) return null;
+    return { k: 'part', fid: p.fid, i: i, d: p.d };
   }
 
   /**
@@ -126,6 +145,22 @@
     var pub = nc.bytesToHex(nc.schnorr.getPublicKey(o.sk));
     var pairs = {};
     function pk(peer) { return pairs[peer] || (pairs[peer] = pairKey(nc, subtle, o.sk, peer)); }
+    var files = {};
+    /** Collect header + parts; when complete, hand the bytes to onFile once. */
+    function filePiece(key, from, peer, meta, part) {
+      var f = files[key] || (files[key] = { parts: {}, got: 0, meta: null, done: false, from: from, peer: peer });
+      if (f.done) return;
+      if (meta) f.meta = meta;
+      if (part && f.parts[part.i] == null) { f.parts[part.i] = part.d; f.got++; }
+      if (o.onFileProgress && f.meta) o.onFileProgress({ fid: f.meta.fid, from: from, peer: peer, got: f.got, n: f.meta.n });
+      if (!f.meta || f.got < f.meta.n) return;
+      var chunks = [], total = 0;
+      for (var i = 0; i < f.meta.n; i++) { if (f.parts[i] == null) return; var u; try { u = unb64(f.parts[i]); } catch (e) { return; } chunks.push(u); total += u.length; }
+      f.done = true; f.parts = {};
+      if (total !== f.meta.size) return;
+      var bytes = new Uint8Array(total), off = 0; chunks.forEach(function (c) { bytes.set(c, off); off += c.length; });
+      if (o.onFile) o.onFile({ fid: f.meta.fid, from: from, peer: peer, meta: f.meta, bytes: bytes });
+    }
     var room = null, socks = {}, seen = {}, seenN = 0, stopped = false, subId = 'meiko' + hex(rand(4));
     function status() {
       var open = 0; relays.forEach(function (u) { var s = socks[u]; if (s && s.ws && s.ws.readyState === 1) open++; });
@@ -141,7 +176,7 @@
       ws.onopen = function () {
         s.tries = 0;
         var since = Math.floor(now() / 1000) - HISTORY_S;
-        ws.send(JSON.stringify(['REQ', subId, { kinds: [KIND_CHAT], '#t': [room.tag], since: since, limit: 200 }, { kinds: [KIND_LIVE], '#t': [room.tag], since: Math.floor(now() / 1000) - 60 }]));
+        ws.send(JSON.stringify(['REQ', subId, { kinds: [KIND_CHAT], '#t': [room.tag], since: since, limit: 1000 }, { kinds: [KIND_LIVE], '#t': [room.tag], since: Math.floor(now() / 1000) - 60 }]));
         emitStatus();
       };
       ws.onmessage = function (m) {
@@ -170,12 +205,19 @@
           if (base.me) return; // own private messages are kept on the device when sent
           pk(ev.pubkey).then(function (key) { return decrypt(subtle, key, p.c); }).then(function (inner) {
             if (!inner || stopped) return; // not for us
-            var q = sanitize({ k: 'chat', text: inner.text, name: inner.name, callsign: inner.callsign });
-            if (q && o.onDM) o.onDM(Object.assign(base, { name: q.name, callsign: q.callsign, text: q.text, id: ev.id, peer: ev.pubkey, to: pub }));
+            if (inner.part) { var pp = sanitizePart(inner.part); if (pp) filePiece('dm:' + ev.pubkey + ':' + pp.fid, ev.pubkey, ev.pubkey, null, pp); return; }
+            var q = sanitize({ k: 'chat', text: inner.text, name: inner.name, callsign: inner.callsign, att: inner.att });
+            if (!q) return;
+            if (o.onDM) o.onDM(Object.assign(base, { name: q.name, callsign: q.callsign, text: q.text, att: q.att, id: ev.id, peer: ev.pubkey, to: pub }));
+            if (q.att) filePiece('dm:' + ev.pubkey + ':' + q.att.fid, ev.pubkey, ev.pubkey, q.att, null);
           }, function () {});
           return;
         }
-        if (p.k === 'chat' && ev.kind === KIND_CHAT) { if (o.onChat) o.onChat(Object.assign(base, p, { id: ev.id })); }
+        if (p.k === 'part' && ev.kind === KIND_CHAT) { filePiece('g:' + ev.pubkey + ':' + p.fid, ev.pubkey, null, null, p); return; }
+        if (p.k === 'chat' && ev.kind === KIND_CHAT) {
+          if (o.onChat) o.onChat(Object.assign(base, p, { id: ev.id }));
+          if (p.att) filePiece('g:' + ev.pubkey + ':' + p.att.fid, ev.pubkey, null, p.att, null);
+        }
         else if (ev.kind === KIND_LIVE && (p.k === 'live' || p.k === 'bye')) { if (o.onLive) o.onLive(Object.assign(base, p)); }
       });
     }
@@ -195,6 +237,14 @@
       if (payload.k !== 'chat') return;
       var p = sanitize(payload); if (p && o.onChat) o.onChat(Object.assign({ from: pub, me: true, at: ev.created_at * 1000, id: ev.id, pending: false }, p));
     }
+    function sendDM(peer, text, me, att) {
+      if (!/^[0-9a-f]{64}$/.test(peer)) return Promise.reject(new Error('Unknown vessel'));
+      text = String(text || '').slice(0, 500);
+      return pk(peer).then(function (key) { return encrypt(subtle, key, { text: text, name: me && me.name, callsign: me && me.callsign, att: att || undefined }, rand); })
+        .then(function (c) {
+          return publish(KIND_CHAT, { k: 'dm', c: c }, CHAT_TTL_S).then(function (r) { if (o.onDM) o.onDM({ from: pub, me: true, peer: peer, to: peer, at: now(), id: r.id, text: text, att: att || null, name: me && me.name }); return r; });
+        });
+    }
     return {
       pubkey: pub,
       start: function () {
@@ -207,20 +257,32 @@
         emitStatus();
       },
       sendLive: function (p) { p.k = p.k || 'live'; return publish(KIND_LIVE, p, 0); },
-      sendDM: function (peer, text, me) {
-        if (!/^[0-9a-f]{64}$/.test(peer)) return Promise.reject(new Error('Unknown vessel'));
-        text = String(text).slice(0, 500);
-        return pk(peer).then(function (key) { return encrypt(subtle, key, { text: text, name: me && me.name, callsign: me && me.callsign }, rand); })
-          .then(function (c) {
-            var payload = { k: 'dm', c: c }, res;
-            return publish(KIND_CHAT, payload, CHAT_TTL_S).then(function (r) { res = r; if (o.onDM) o.onDM({ from: pub, me: true, peer: peer, to: peer, at: now(), id: r.id, text: text, name: me && me.name }); return res; });
-          });
+      sendDM: function (peer, text, me, att) { return sendDM(peer, text, me, att); },
+      /**
+       * Send a file to the group (to = 'group') or privately (to = peer pubkey): one header message, then
+       * the bytes in CHUNK-sized encrypted parts. meta = { name, mime, w?, h? }. Returns { fid, sent }.
+       */
+      sendFile: function (to, bytes, meta, caption, me, onProgress) {
+        if (!bytes || !bytes.length) return Promise.reject(new Error('Empty file'));
+        if (bytes.length > MAX_FILE) return Promise.reject(new Error('File too large (max ' + Math.round(MAX_FILE / 1024) + ' KB)'));
+        var fid = meta.fid && /^[0-9a-f]{16}$/.test(meta.fid) ? meta.fid : hex(rand(8)), n = Math.ceil(bytes.length / CHUNK), dm = to !== 'group';
+        var att = sanitizeAtt({ fid: fid, name: meta.name, mime: meta.mime, size: bytes.length, n: n, w: meta.w, h: meta.h });
+        var head = dm ? sendDM(to, caption || '', me, att) : publish(KIND_CHAT, Object.assign({}, me, { k: 'chat', text: String(caption || '').slice(0, 500), att: att }), CHAT_TTL_S);
+        var minSent = Infinity, delay = o.partDelay == null ? 300 : o.partDelay;
+        function part(i) {
+          if (i >= n) return Promise.resolve();
+          var d = b64(bytes.subarray(i * CHUNK, Math.min(bytes.length, (i + 1) * CHUNK)));
+          var pr = dm ? pk(to).then(function (key) { return encrypt(subtle, key, { part: { fid: fid, i: i, d: d } }, rand); }).then(function (c) { return publish(KIND_CHAT, { k: 'dm', c: c }, CHAT_TTL_S); })
+            : publish(KIND_CHAT, { k: 'part', fid: fid, i: i, d: d }, CHAT_TTL_S);
+          return pr.then(function (r) { minSent = Math.min(minSent, r.sent); if (onProgress) onProgress(i + 1, n); return new Promise(function (res) { setTimeout(res, delay); }); }).then(function () { return part(i + 1); });
+        }
+        return head.then(function (r) { minSent = r.sent; return part(0); }).then(function () { return { fid: fid, att: att, sent: minSent }; });
       },
       sendChat: function (text, me) { return publish(KIND_CHAT, Object.assign({}, me, { k: 'chat', text: String(text).slice(0, 500) }), CHAT_TTL_S); },
       status: status
     };
   }
 
-  return { KIND_LIVE: KIND_LIVE, KIND_CHAT: KIND_CHAT, DEFAULT_RELAYS: DEFAULT_RELAYS, normCode: normCode, codeOk: codeOk, newCode: newCode,
+  return { KIND_LIVE: KIND_LIVE, KIND_CHAT: KIND_CHAT, CHUNK: CHUNK, MAX_FILE: MAX_FILE, DEFAULT_RELAYS: DEFAULT_RELAYS, normCode: normCode, codeOk: codeOk, newCode: newCode,
     deriveRoom: deriveRoom, pairKey: pairKey, safetyCode: safetyCode, shortId: shortId, encrypt: encrypt, decrypt: decrypt, signEvent: signEvent, verifyEvent: verifyEvent, sanitize: sanitize, createClient: createClient };
 });

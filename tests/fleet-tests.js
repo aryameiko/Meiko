@@ -155,6 +155,51 @@ module.exports = function run(test) {
     }));
   });
 
+  t('Fleet: a photo/file sent to the group arrives complete; another group gets nothing', function () {
+    var relay = new MockRelay(), files = { b: [], x: [] };
+    var a = client(relay, 'MEIKO-FILE-0006', { partDelay: 0 }), b = client(relay, 'MEIKO-FILE-0006', { onFile: function (f) { files.b.push(f); } }), x = client(relay, 'MEIKO-FILE-9999', { onFile: function (f) { files.x.push(f); } });
+    var data = nc.randomBytes(40000);
+    return Promise.all([a.start(), b.start(), x.start()]).then(function () { return wait(20); })
+      .then(function () { return a.sendFile('group', data, { name: 'foto.jpg', mime: 'image/jpeg', w: 800, h: 600 }, 'Cuaca di sini', { name: 'KM Bahari' }); })
+      .then(function (r) { assert.strictEqual(r.att.n, 3); return wait(80); }).then(function () {
+        assert.strictEqual(files.b.length, 1); assert.deepStrictEqual(Array.from(files.b[0].bytes), Array.from(data));
+        assert.strictEqual(files.b[0].meta.name, 'foto.jpg'); assert.strictEqual(files.b[0].meta.w, 800);
+        var head = b.got.chat.filter(function (m) { return m.att; })[0]; assert.ok(head); assert.strictEqual(head.text, 'Cuaca di sini');
+        assert.strictEqual(files.x.length, 0);
+        relay.log.filter(function (m) { return m[0] === 'EVENT'; }).forEach(function (m) { assert.ok(JSON.stringify(m).length < 60000, 'event too large for public relays: ' + JSON.stringify(m).length); });
+        [a, b, x].forEach(function (c) { c.stop(); });
+      });
+  });
+  t('Fleet: a private file reaches only the recipient (third member gets nothing) and stays under relay size limits', function () {
+    var relay = new MockRelay(), got = { b: [], x: [] }, dmB = [];
+    var a = client(relay, 'MEIKO-PFIL-0007', { partDelay: 0 });
+    var b = client(relay, 'MEIKO-PFIL-0007', { onFile: function (f) { got.b.push(f); }, onDM: function (m) { dmB.push(m); } });
+    var x = client(relay, 'MEIKO-PFIL-0007', { onFile: function (f) { got.x.push(f); } });
+    var data = nc.randomBytes(50000);
+    return Promise.all([a.start(), b.start(), x.start()]).then(function () { return wait(20); })
+      .then(function () { return a.sendFile(b.pubkey, data, { name: 'manifest.pdf', mime: 'application/pdf' }, '', { name: 'KM Bahari' }); })
+      .then(function () { return wait(120); }).then(function () {
+        assert.strictEqual(got.b.length, 1); assert.deepStrictEqual(Array.from(got.b[0].bytes), Array.from(data)); assert.strictEqual(got.b[0].peer, a.pubkey);
+        assert.strictEqual(dmB.length, 1); assert.strictEqual(dmB[0].att.name, 'manifest.pdf');
+        assert.strictEqual(got.x.length, 0);
+        relay.log.filter(function (m) { return m[0] === 'EVENT'; }).forEach(function (m) { assert.ok(JSON.stringify(m).length < 64000, 'event too large: ' + JSON.stringify(m).length); });
+        [a, b, x].forEach(function (c) { c.stop(); });
+      });
+  });
+  t('Fleet: oversized files are refused; forged parts from another member cannot corrupt a file', function () {
+    var relay = new MockRelay(), files = [];
+    var a = client(relay, 'MEIKO-SIZE-0008', { partDelay: 0 }), b = client(relay, 'MEIKO-SIZE-0008', { onFile: function (f) { files.push(f); } }), m = client(relay, 'MEIKO-SIZE-0008', { partDelay: 0 });
+    return Promise.all([a.start(), b.start(), m.start()]).then(function () { return wait(20); })
+      .then(function () { return a.sendFile('group', new Uint8Array(fleet.MAX_FILE + 1), { name: 'big.bin', mime: 'application/octet-stream' }, '', {}).then(function () { throw new Error('accepted'); }, function (e) { assert.ok(/too large/.test(e.message)); }); })
+      .then(function () { return a.sendFile('group', new Uint8Array(20000).fill(7), { name: 'ok.bin', mime: 'application/octet-stream' }, '', {}); })
+      .then(function (r) { return m.sendFile('group', new Uint8Array(20000).fill(9), { name: 'evil.bin', mime: 'application/octet-stream' }, '', {}).then(function () { return r; }); })
+      .then(function () { return wait(80); }).then(function () {
+        var ok = files.filter(function (f) { return f.meta.name === 'ok.bin'; })[0];
+        assert.ok(ok); assert.ok(Array.prototype.every.call(ok.bytes, function (v) { return v === 7; }));
+        [a, b, m].forEach(function (c) { c.stop(); });
+      });
+  });
+
   return tests.reduce(function (p, tc) {
     return p.then(function () { return test(tc[0], tc[1]); });
   }, Promise.resolve());

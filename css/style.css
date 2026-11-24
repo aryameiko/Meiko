@@ -699,3 +699,20 @@ svg.i.rot-up { transform: rotate(-90deg); } svg.i.rot-down { transform: rotate(9
 .msg.me { align-self: flex-end; background: color-mix(in srgb, var(--accent) 26%, transparent); border-radius: 12px 12px 4px 12px; }
 .msg-meta { font-size: 11px; color: var(--muted); } .msg-text { white-space: pre-wrap; overflow-wrap: anywhere; }
 .chat-form { display: flex; gap: 8px; } .chat-form input { flex: 1; min-width: 0; }
+
+.att-btn { flex: none; padding-inline: 10px; } .att-btn svg { width: 20px; height: 20px; }
+.att-pick { display: grid; gap: 8px; margin-top: 10px; }
+.send-prog { padding: 2px 4px; }
+.att { position: relative; margin: 4px 0 2px; border-radius: 10px; overflow: hidden; }
+.att-img { width: min(240px, 60vw); min-height: 60px; background: color-mix(in srgb, var(--text-2) 10%, transparent); display: grid; place-items: center; }
+.att-img img { width: 100%; height: 100%; object-fit: cover; display: block; cursor: zoom-in; }
+.att-file { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: color-mix(in srgb, var(--text-2) 8%, transparent); min-width: 0; }
+.att-file > svg { width: 26px; height: 26px; flex: none; }
+.att-file span { display: grid; min-width: 0; } .att-file b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.att-file small { color: var(--muted); font-size: 11.5px; }
+.att-state { color: var(--muted); font-size: 11.5px; padding: 6px; }
+.att-dl { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; font-weight: 600; text-decoration: none; }
+.att-file .att-dl { margin-left: auto; flex: none; }
+.att-img .att-dl { position: absolute; right: 6px; bottom: 6px; background: rgba(0,0,0,.55); color: #fff; border-radius: 8px; padding: 4px; }
+.att-dl svg { width: 16px; height: 16px; }
+img.att-full { width: 100%; height: auto; border-radius: 10px; display: block; }
