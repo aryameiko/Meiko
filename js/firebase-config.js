@@ -14,6 +14,6 @@ MEIKO.FIREBASE_CONFIG = {
   appId: '1:130685004974:web:a8eec9e5bb5fcb2a43d13f',
   /* Firebase App Check (bot protection): reCAPTCHA Enterprise / Fraud Defense key ID from Google Cloud console.
    * Public by design; empty = App Check off. appCheckProvider: 'enterprise' (default) or 'v3' (classic, deprecated). */
-  appCheckSiteKey: '',
+  appCheckSiteKey: '6LexCjEuAAAAAJKsomsCNVRZ3X-si1wLWM3EPB19',
   appCheckProvider: 'enterprise'
 };
