@@ -166,6 +166,7 @@
           est = S2.best(A.key, B.key);
           if (est == null) { var rr = S2.route(A.key, B.key); if (rr) { est = rr.nm; warn.push('Estimated through ' + rr.path.slice(1, -1).map(function (k) { return S2.byKey[k].name; }).join(', ') + '.'); } }
         }
+        if (est != null) [A, B].forEach(function (x) { if (x.note) warn.push('<b translate="no">' + esc(x.name) + '</b>: ' + esc(x.note)); });
         if (est != null) {
           body += ui.big('Estimated sea distance', ui.num(est, 0), 'NM', ui.num(est * 1.852, 0) + ' km');
           copy += '\nEstimated sea distance: ' + Math.round(est) + ' NM';

@@ -4,7 +4,7 @@
  * cache-first with a background refresh ("stale-while-revalidate") for same-origin GET requests.
  * Bump CACHE_VERSION whenever any file changes so clients pick up the new version.
  */
-var CACHE_VERSION = 'meiko-v1.16.1';
+var CACHE_VERSION = 'meiko-v1.16.2';
 var ASSETS = [
   './', 'index.html', 'js/theme-boot.js', 'manifest.json', 'css/style.css',
   'assets/icons/icon.svg', 'assets/icons/icon-192.png', 'assets/icons/icon-512.png', 'assets/icons/icon-maskable-512.png', 'assets/icons/apple-touch-icon.png', 'assets/icons/logo-round.png', 'assets/icons/logo-full.jpg',
@@ -50,10 +50,19 @@ self.addEventListener('install', function (event) {
   event.waitUntil(caches.open(CACHE_VERSION).then(function (cache) { return cache.addAll(ASSETS.map(function (u) { return new Request(u, { cache: 'reload' }); })); }).then(function () { return self.skipWaiting(); }));
 });
 
+/** v1.16: drop tiles of hosts MEIKO no longer uses (Esri imagery) from the viewed-tiles cache. */
+function purgeOldHosts() {
+  return caches.open(SEEN_CACHE).then(function (c) {
+    return c.keys().then(function (keys) {
+      return Promise.all(keys.filter(function (k) { return TILE_HOSTS.indexOf(new URL(k.url).hostname) === -1; }).map(function (k) { return c.delete(k); }));
+    });
+  }).catch(function () {});
+}
+
 self.addEventListener('activate', function (event) {
   event.waitUntil(caches.keys().then(function (keys) {
     return Promise.all(keys.filter(function (k) { return k.indexOf('meiko-') === 0 && k !== CACHE_VERSION; }).map(function (k) { return caches.delete(k); }));
-  }).then(function () { return self.clients.claim(); }));
+  }).then(purgeOldHosts).then(function () { return self.clients.claim(); }));
 });
 
 self.addEventListener('fetch', function (event) {

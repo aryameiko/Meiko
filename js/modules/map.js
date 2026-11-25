@@ -34,7 +34,6 @@
     sat: 'https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless_3857/default/GoogleMapsCompatible/{z}/{y}/{x}.jpg',
     sea: 'https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png'
   };
-  /* Average tile sizes (KB) used only for the download size estimate. */
   var BASES = [
     { id: 'osm', label: 'Map', url: URLS.osm, create: function (L) {
       return L.tileLayer(URLS.osm, { maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors' });
