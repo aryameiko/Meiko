@@ -141,7 +141,7 @@
         actions('Calculate', '<button class="btn btn-ghost" type="button" data-swap>' + icon('i-swap') + 'Swap</button>'),
         ui.empty('i-anchor', 'Choose two ports', 'Results show the estimated sea distance, straight-line distance and bearings.'),
         ui.help('About these distances',
-          '<p><b>Estimated sea distance</b> is a typical sailing distance between the two ports. Where no figure exists for the pair directly, it is built from legs through other ports, so it may be longer than a direct passage.</p>' +
+          '<p><b>Estimated sea distance</b> is computed by MEIKO: the shortest path over water between the two harbours on the Natural Earth 1:10m coastline. It avoids land, but not shallows, reefs or traffic separation schemes, and small islands may be missing, so real passages are often somewhat longer.</p>' +
           '<p><b>Straight-line distance</b> is the great circle between approximate harbour positions. Actual voyages follow routes that avoid land, shallows, restricted areas and traffic separation schemes. Plan passages with official charts and sailing directions.</p>') +
         ui.disclaimer());
       var form = ui.$('form', view), out = ui.$('[data-out]', view);

@@ -77,15 +77,15 @@
   var DATA = [
     ['World Magnetic Model 2025', 'NOAA NCEI & British Geological Survey · public domain', 'https://www.ncei.noaa.gov/products/world-magnetic-model'],
     ['World outline (countries-50m)', 'world-atlas, ISC · © Michael Bostock; data Natural Earth (public domain). Borders are shown as in the source and are not an official position on any boundary.', 'https://github.com/topojson/world-atlas'],
-    ['Star catalogue & constellations', 'd3-celestial, BSD-3-Clause · © Olaf Frohn. Star positions from the HYG database (© David Nash, CC BY-SA) / ESA Hipparcos. MEIKO\'s derived star table (js/data/stars-data.js) is shared under the same CC BY-SA terms.', 'https://github.com/ofrohn/d3-celestial'],
+    ['Star catalogue & constellations', 'd3-celestial, BSD-3-Clause · © Olaf Frohn. Star positions from the HYG database (© David Nash / astronexus, CC BY-SA 4.0) / ESA Hipparcos. MEIKO\'s derived star table (js/data/stars-data.js) is shared under the same CC BY-SA terms.', 'https://github.com/ofrohn/d3-celestial'],
     ['Port positions', 'SMDG Terminal Code List; Kemenhub/Dephub port points via bennyistanto/geodata; NGA World Port Index (US Government, public domain). Unverified; see each port\'s source.', 'https://smdg.org'],
-    ['Port distance tables', 'Sea distance tables (WILBAR / WILTIM) supplied by the app owner. Figures transcribed as published.', null],
+    ['Port sea distances', 'Computed by MEIKO (tools/sea-distances.js): shortest water path on the Natural Earth 1:10m coastline (public domain). No third-party distance tables.', null],
     ['Solar & prayer algorithms', 'NOAA Solar Calculator / J. Meeus, Astronomical Algorithms (methods, own code).', null]
   ];
   var MAPS = [
     ['Street map', '© OpenStreetMap contributors, ODbL. Tiles by the OpenStreetMap Foundation under its tile usage policy (viewing only; no bulk download).', 'https://www.openstreetmap.org/copyright'],
-    ['Satellite & place names', 'Esri World Imagery and World Boundaries and Places · © Esri, Maxar, Earthstar Geographics and the GIS User Community. Use is subject to Esri\'s terms.', 'https://www.esri.com/en-us/legal/terms/full-master-agreement'],
-    ['Sea marks', '© OpenSeaMap contributors (CC BY-SA). Community data, not official.', 'https://www.openseamap.org']
+    ['Satellite', 'EOxCloudless 2016 by EOX IT Services GmbH (Contains modified Copernicus Sentinel data 2016 & 2017), licensed under CC BY 4.0. Viewing only; no bulk download.', 'https://cloudless.eox.at', 'https://creativecommons.org/licenses/by/4.0/'],
+    ['Sea marks', '© OpenSeaMap contributors: data ODbL, map tiles CC BY-SA 2.0. Community data, not official.', 'https://www.openseamap.org', 'https://creativecommons.org/licenses/by-sa/2.0/']
   ];
   function rows(list) {
     return '<ul class="list small">' + list.map(function (x) {

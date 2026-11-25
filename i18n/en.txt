@@ -1523,3 +1523,14 @@ One more thing: choose your country and your language. Other vessels see your fl
 Where are you from? Other vessels see your flag and language, so you know which language to use with each other.
 The MEIKO Privacy Policy has been updated. New: other MEIKO vessels see your flag and language in Fleet & Chat (choose “Prefer not to say” to hide them). They are also stored with your account to count users per country. The policy also explains the other data MEIKO uses and the important limits for navigation. Please read and agree to continue.
 Speaks
+Showing the built-in world outline. Street or satellite tiles work only for areas you viewed before.
+EOxCloudless 2016: Copernicus Sentinel-2 cloud-free mosaic (2016–2017, 10 m), CC BY 4.0. Harbours and new buildings may be missing.
+Downloading whole areas in advance is not offered: the open map services MEIKO uses do not allow it.
+Without signal the map still opens with a built-in world outline (coastlines and borders), and you can pick points on it. Map and satellite areas you viewed recently stay available on this device.
+is computed by MEIKO: the shortest path over water between the two harbours on the Natural Earth 1:10m coastline. It avoids land, but not shallows, reefs or traffic separation schemes, and small islands may be missing, so real passages are often somewhat longer.
+Computed by MEIKO (tools/sea-distances.js): shortest water path on the Natural Earth 1:10m coastline (public domain). No third-party distance tables.
+EOxCloudless 2016 by EOX IT Services GmbH (Contains modified Copernicus Sentinel data 2016 & 2017), licensed under CC BY 4.0. Viewing only; no bulk download.
+Port sea distances
+d3-celestial, BSD-3-Clause · © Olaf Frohn. Star positions from the HYG database (© David Nash / astronexus, CC BY-SA 4.0) / ESA Hipparcos. MEIKO's derived star table (js/data/stars-data.js) is shared under the same CC BY-SA terms.
+© OpenSeaMap contributors: data ODbL, map tiles CC BY-SA 2.0. Community data, not official.
+River port: measured from the nearest coast, so the figure is rough.

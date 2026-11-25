@@ -1,8 +1,8 @@
 /*
  * MEIKO — Interactive map (Leaflet, no API key).
  *
- *  - Base layers: OpenStreetMap (street map) and Esri World Imagery (satellite) with an optional
- *    place-name overlay. Nautical overlay: OpenSeaMap seamarks.
+ *  - Base layers: OpenStreetMap (street map, ODbL) and EOxCloudless 2016 (Sentinel-2 satellite mosaic,
+ *    CC BY 4.0). Nautical overlay: OpenSeaMap seamarks (CC BY-SA). Only openly licensed sources (v1.16).
  *  - Tap the map to pick a point → coordinates in DD / DDM / DMS, copy, save, open in Google Maps /
  *    Google Earth, or send it to a tool (Distance, Course, Qibla, Sunrise…).
  *  - Track mode (also registered as the 'track' tool): waypoint routes, see js/modules/track.js.
@@ -17,9 +17,8 @@
  *  - Leaflet and a Natural Earth 1:50m world outline (land + borders, public domain) ship with the app,
  *    so the map always opens and point-picking works with no signal (outline only, no streets).
  *  - Tiles you view are kept by the service worker (cache 'tiles-seen-v1', capped).
- *  - "Save area for offline" downloads the tiles of the visible area for a few zoom levels into
- *    'tiles-saved-v1' (kept until deleted). Limited to zoom ≤ 16 and a tile cap, to stay within the
- *    OpenStreetMap tile usage policy (no large bulk downloads).
+ *  - No bulk "save area" download: neither the OpenStreetMap tile policy nor the free EOX service allows
+ *    pre-fetching tiles for offline use. Areas saved by older versions (Esri imagery) are removed once.
  */
 (function () {
   'use strict';
@@ -31,26 +30,25 @@
   /* ---------- Layer providers ---------- */
   var URLS = {
     osm: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-    sat: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    places: 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+    // EOxCloudless 2016 (layer s2cloudless_3857): the only year released under CC BY 4.0; later years are non-commercial.
+    sat: 'https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless_3857/default/GoogleMapsCompatible/{z}/{y}/{x}.jpg',
     sea: 'https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png'
   };
   /* Average tile sizes (KB) used only for the download size estimate. */
-  var TILE_KB = { osm: 20, sat: 30, places: 8, sea: 3 };
   var BASES = [
     { id: 'osm', label: 'Map', url: URLS.osm, create: function (L) {
       return L.tileLayer(URLS.osm, { maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors' });
     } },
     { id: 'sat', label: 'Satellite', url: URLS.sat, create: function (L) {
-      return L.tileLayer(URLS.sat, { maxZoom: 19, maxNativeZoom: 18, attribution: 'Imagery &copy; Esri, Maxar, Earthstar Geographics, and the GIS User Community' });
+      return L.tileLayer(URLS.sat, { maxZoom: 19, maxNativeZoom: 15, attribution: '<a href="https://cloudless.eox.at" target="_blank" rel="noopener">EOxCloudless 2016</a> by <a href="https://eox.at" target="_blank" rel="noopener">EOX IT Services GmbH</a> (Contains modified Copernicus Sentinel data 2016 &amp; 2017), CC BY 4.0' });
     } },
     { id: 'outline', label: 'Offline', create: function (L) { return L.layerGroup(); } }
   ];
   function placesLayer(L) {
-    return L.tileLayer(URLS.places, { maxZoom: 19, maxNativeZoom: 18, pane: 'overlayPane' });
+    return null; // the Esri place-name overlay was removed in v1.16 (not openly licensed)
   }
   function seaLayer(L) {
-    return L.tileLayer(URLS.sea, { maxZoom: 18, minZoom: 3, attribution: 'Seamarks &copy; <a href="https://www.openseamap.org" target="_blank" rel="noopener">OpenSeaMap</a>', pane: 'overlayPane', zIndex: 5 });
+    return L.tileLayer(URLS.sea, { maxZoom: 18, minZoom: 3, attribution: 'Seamarks &copy; <a href="https://www.openseamap.org" target="_blank" rel="noopener">OpenSeaMap</a> (CC BY-SA 2.0)', pane: 'overlayPane', zIndex: 5 });
   }
 
   /* ---------- Built-in offline outline (Natural Earth 1:50m, bundled) ---------- */
@@ -134,7 +132,7 @@
       el.classList.toggle('is-outline', def.id === 'outline');
     }
     function setPlaces(on) {
-      var want = on && baseId === 'sat';
+      var want = false; // no openly licensed place-name overlay
       if (want && !places) places = placesLayer(L).addTo(map);
       if (!want && places) { map.removeLayer(places); places = null; }
     }
@@ -261,7 +259,7 @@
     ui.sheet({ title: 'Location unavailable', html: ui.notice('err', esc(err.message)) + '<p class="small muted mt-12">You can still tap the map to pick a point.</p><div class="actions"><button class="btn btn-ghost" data-close data-lh>' + icon('i-info') + 'How to allow location</button></div>', onMount: function (body) { ui.$('[data-lh]', body).addEventListener('click', function () { setTimeout(MEIKO.app.showLocationHelp, 0); }); } });
   }
   function offlineNote() {
-    return navigator.onLine === false ? ui.notice('warn', '<b>Offline.</b> Showing the built-in world outline. Street or satellite tiles work only for areas you saved or viewed before.') : '';
+    return navigator.onLine === false ? ui.notice('warn', '<b>Offline.</b> Showing the built-in world outline. Street or satellite tiles work only for areas you viewed before.') : '';
   }
   /** Parse "lat, lon" typed into one box. */
   function parsePair(text) {
@@ -317,161 +315,22 @@
     });
   }
 
-  /* ---------- Offline areas ---------- */
-  var SAVED_CACHE = 'tiles-saved-v1', AREAS_KEY = 'map:areas', MAX_TILES = 4000, MAX_Z = 16;
-  function lon2x(lon, z) { return Math.floor((lon + 180) / 360 * Math.pow(2, z)); }
-  function lat2y(lat, z) {
-    lat = Math.max(-85.0511, Math.min(85.0511, lat));
-    var r = lat * Math.PI / 180;
-    return Math.floor((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * Math.pow(2, z));
+  /* ---------- Offline maps ----------
+   * No bulk download: the OpenStreetMap tile policy forbids it and the free EOX service does not offer it
+   * (offline copies are a paid EOX product). Tiles you view are still kept by the service worker.
+   * Areas saved by older versions (Esri imagery, place names, sea marks) are removed once. */
+  var SAVED_CACHE = 'tiles-saved-v1', AREAS_KEY = 'map:areas';
+  function purgeSaved() {
+    if (MEIKO.storage.get('map:savedPurged', false)) return;
+    MEIKO.storage.remove(AREAS_KEY); MEIKO.storage.set('map:savedPurged', true);
+    if ('caches' in window) caches.delete(SAVED_CACHE).catch(function () {});
   }
-  /** Tile URLs for the bounds {s,w,n,e} at zooms z0..z1 for the given layer ids. */
-  function areaTiles(b, z0, z1, layers) {
-    var out = [];
-    for (var z = z0; z <= z1; z++) {
-      var n = Math.pow(2, z), x0 = lon2x(Math.max(-180, b.w), z), x1 = lon2x(Math.min(179.9999, b.e), z);
-      var y0 = lat2y(b.n, z), y1 = lat2y(b.s, z);
-      for (var x = x0; x <= Math.min(x1, n - 1); x++) for (var y = Math.max(0, y0); y <= Math.min(y1, n - 1); y++)
-        layers.forEach(function (id) { if (id === 'sea' && z < 3) return; out.push({ id: id, url: URLS[id].replace('{z}', z).replace('{x}', x).replace('{y}', y) }); });
-    }
-    return out;
-  }
-  function estimateKB(tiles) { return tiles.reduce(function (a, t) { return a + (TILE_KB[t.id] || 20); }, 0); }
-  function sizeLabel(kb) { return kb >= 1024 ? ui.num(kb / 1024, 1) + ' MB' : Math.round(kb) + ' KB'; }
-
-  function fetchTile(url) {
-    // CORS first (small, real size in storage); fall back to an opaque response if the host has no CORS.
-    return fetch(url, { mode: 'cors', credentials: 'omit' }).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r; })
-      .catch(function (e) { if (/HTTP/.test(e.message)) throw e; return fetch(url, { mode: 'no-cors', credentials: 'omit' }); });
-  }
-  /** Download tiles into the saved cache. 2 requests at a time, skipping tiles already stored. */
-  function downloadTiles(tiles, onProgress, isCancelled) {
-    if (!('caches' in window)) return Promise.reject(new Error('This browser cannot store map tiles offline.'));
-    return caches.open(SAVED_CACHE).then(function (cache) {
-      var i = 0, done = 0, failed = 0;
-      function next() {
-        if (isCancelled() || i >= tiles.length) return Promise.resolve();
-        var t = tiles[i++];
-        return cache.match(t.url).then(function (hit) {
-          if (hit) return;
-          return fetchTile(t.url).then(function (r) { return cache.put(t.url, r); });
-        }).catch(function () { failed++; }).then(function () { done++; onProgress(done, failed); return next(); });
-      }
-      return Promise.all([next(), next()]).then(function () { return { done: done, failed: failed }; });
-    });
-  }
-  function areas() { return MEIKO.storage.get(AREAS_KEY, []) || []; }
-  function deleteArea(id) {
-    var list = areas(), a = list.filter(function (x) { return x.id === id; })[0];
-    MEIKO.storage.set(AREAS_KEY, list.filter(function (x) { return x.id !== id; }));
-    if (!a || !('caches' in window)) return Promise.resolve();
-    // Keep tiles that another saved area still uses.
-    var keep = {};
-    areas().forEach(function (o) { areaTiles(o.b, o.z0, o.z1, o.layers).forEach(function (t) { keep[t.url] = 1; }); });
-    return caches.open(SAVED_CACHE).then(function (c) {
-      return Promise.all(areaTiles(a.b, a.z0, a.z1, a.layers).filter(function (t) { return !keep[t.url]; }).map(function (t) { return c.delete(t.url); }));
-    });
-  }
-
-  /** Since v1.12: remove street-map (OpenStreetMap) tiles saved by older versions; its tile policy forbids offline downloads. */
-  function purgeSavedOsm() {
-    if (MEIKO.storage.get('map:osmPurged', false)) return Promise.resolve(0);
-    var list = areas(), changed = 0;
-    list = list.map(function (a) { if (a.layers.indexOf('osm') === -1) return a; changed++; var l = a.layers.filter(function (x) { return x !== 'osm'; }); return Object.assign({}, a, { layers: l }); })
-      .filter(function (a) { return a.layers.length; });
-    MEIKO.storage.set(AREAS_KEY, list);
-    var done = function () { MEIKO.storage.set('map:osmPurged', true); return changed; };
-    if (!('caches' in window)) return Promise.resolve(done());
-    return caches.open(SAVED_CACHE).then(function (c) {
-      return c.keys().then(function (keys) { return Promise.all(keys.filter(function (k) { return k.url.indexOf('tile.openstreetmap.org') !== -1; }).map(function (k) { return c.delete(k); })); });
-    }).then(done, done);
-  }
-  function offlineCard(view, ctl) {
-    var box = ui.$('[data-offline-card]', view), rects = null, job = null;
-    function drawRects() {
-      if (rects) rects.remove();
-      rects = ctl.L.layerGroup().addTo(ctl.map);
-      areas().forEach(function (a) { ctl.L.rectangle([[a.b.s, a.b.w], [a.b.n, a.b.e]], { className: 'area-rect', interactive: false, weight: 1 }).addTo(rects); });
-    }
-    function plan() {
-      var bb = ctl.map.getBounds(), z = ctl.map.getZoom();
-      var b = { s: bb.getSouth(), w: bb.getWest(), n: bb.getNorth(), e: bb.getEast() };
-      // The OpenStreetMap tile policy forbids prefetching / "download for offline" on tile.openstreetmap.org,
-      // so the street map is never bulk-saved (viewed tiles are still cached as you browse). Satellite can be saved.
-      var base = ctl.base() === 'sat' ? 'sat' : null;
-      var layers = base ? [base] : []; if (base === 'sat' && getView().places) layers.push('places'); if (ctl.sea()) layers.push('sea');
-      var z0 = Math.max(1, Math.min(z, MAX_Z)), z1 = Math.min(MAX_Z, z0 + (+(ui.$('[data-depth]', box) || { value: 3 }).value));
-      // Also keep a few lower zoom levels (very few tiles) so the area still shows when zoomed out.
-      z0 = Math.max(2, z0 - 3);
-      var tiles = areaTiles(b, z0, z1, layers);
-      // Trim deepest zooms until under the cap.
-      while (tiles.length > MAX_TILES && z1 > z0) { z1--; tiles = areaTiles(b, z0, z1, layers); }
-      return { b: b, z0: z0, z1: z1, layers: layers, tiles: tiles, tooBig: tiles.length > MAX_TILES };
-    }
-    function render() {
-      var list = areas(), p = plan();
-      var names = { osm: 'street map', sat: 'satellite', places: 'place names', sea: 'sea marks' };
-      var osmNote = ctl.base() !== 'sat' ? '<p class="small onb-warn">' + icon('i-info') + ' The street map (OpenStreetMap) cannot be downloaded for offline use: its tile policy does not allow it. Areas you have viewed are still kept for a while. Switch to <b>Satellite</b> to save an area.</p>' : '';
-      box.innerHTML = '<div class="card-title">' + icon('i-wifi-off') + 'Offline maps</div>' +
-        '<p class="small muted">Without signal the map still opens with a built-in world outline (coastlines and borders), and you can pick points on it. Street-map areas you viewed recently stay available. To save satellite imagery for offline use, save an area while online.</p>' + osmNote +
-        '<label class="field mt-12"><span>Detail to save</span><select data-depth>' +
-        [[1, 'Light (+1 zoom level)'], [2, 'Medium (+2 levels)'], [3, 'Detailed (+3 levels)'], [4, 'Very detailed (+4 levels)']].map(function (o) { return '<option value="' + o[0] + '"' + (o[0] === (box._depth || 3) ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') +
-        '</select><small class="hint" data-est></small></label>' +
-        '<div class="flex mt-8"><button class="btn btn-primary btn-sm" data-dl>' + icon('i-plus') + 'Save visible area</button><span class="small muted" data-dl-status></span></div>' +
-        (list.length ? '<div class="section-title">Saved areas</div><ul class="list small">' + list.map(function (a) {
-          return '<li><div class="grow"><b>' + esc(a.name) + '</b><small>' + a.count + ' tiles · zoom ' + a.z0 + '–' + a.z1 + ' · ' + esc(a.layers.map(function (l) { return names[l]; }).join(', ')) + '</small></div>' +
-            '<button class="icon-btn" data-show="' + a.id + '" aria-label="Show">' + icon('i-search') + '</button><button class="icon-btn" data-delarea="' + a.id + '" aria-label="Delete">' + icon('i-trash') + '</button></li>';
-        }).join('') + '</ul>' : '') +
-        '<p class="small muted mt-8" data-usage></p>';
-      var est = ui.$('[data-est]', box);
-      if (!p.layers.length) { est.textContent = 'Nothing to save with the street map. Switch to Satellite.'; ui.$('[data-dl]', box).disabled = true; }
-      else est.textContent = p.tiles.length + ' tiles, about ' + sizeLabel(estimateKB(p.tiles)) + ' · zoom ' + p.z0 + '–' + p.z1 + ' · ' + p.layers.map(function (l) { return names[l]; }).join(' + ') +
-        (p.z0 >= MAX_Z ? ' · zoom out to save more area' : '');
-      ui.$('[data-depth]', box).addEventListener('change', function (e) { box._depth = +e.target.value; render(); });
-      ui.$('[data-dl]', box).addEventListener('click', start);
-      ui.$$('[data-delarea]', box).forEach(function (b) { b.addEventListener('click', function () { deleteArea(b.dataset.delarea).then(function () { render(); drawRects(); ui.toast('Offline area deleted'); }); }); });
-      ui.$$('[data-show]', box).forEach(function (b) { b.addEventListener('click', function () {
-        var a = areas().filter(function (x) { return x.id === b.dataset.show; })[0]; if (a) ctl.map.fitBounds([[a.b.s, a.b.w], [a.b.n, a.b.e]]);
-      }); });
-      if (navigator.storage && navigator.storage.estimate) navigator.storage.estimate().then(function (e) {
-        var u = ui.$('[data-usage]', box); if (u && e.usage != null) u.textContent = 'Storage used by MEIKO on this device: ' + sizeLabel(e.usage / 1024) + (e.quota ? ' of ' + sizeLabel(e.quota / 1024) + ' available' : '') + '.';
-      });
-      if (job) setBusy(true);
-    }
-    function setBusy(on) {
-      var b = ui.$('[data-dl]', box); if (!b) return;
-      b.innerHTML = on ? icon('i-x') + 'Cancel' : icon('i-plus') + 'Save visible area';
-      b.classList.toggle('btn-danger', on); b.classList.toggle('btn-primary', !on);
-    }
-    function start() {
-      if (job) { job.cancel = true; return; }
-      if (navigator.onLine === false) return ui.toast('You are offline. Connect to the internet to save an area.');
-      var p = plan();
-      if (!p.tiles.length) return;
-      if (p.tooBig) return ui.toast('Area too large. Zoom in a little and try again.');
-      var c = ctl.map.getCenter();
-      var name = 'Area near ' + ui.coordPair(c.lat, wrapLon(c.lng));
-      job = { cancel: false };
-      setBusy(true);
-      if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(function () {});
-      var st = ui.$('[data-dl-status]', box);
-      downloadTiles(p.tiles, function (d, f) {
-        st = ui.$('[data-dl-status]', box);
-        if (st) st.textContent = d + ' / ' + p.tiles.length + (f ? ' · ' + f + ' failed' : '');
-      }, function () { return job.cancel; }).then(function (r) {
-        var cancelled = job.cancel; job = null;
-        if (!cancelled && r.done - r.failed > 0) {
-          var list = areas(); list.push({ id: 'a' + Date.now().toString(36), name: name, b: p.b, z0: p.z0, z1: p.z1, layers: p.layers, count: p.tiles.length, at: new Date().toISOString() });
-          MEIKO.storage.set(AREAS_KEY, list);
-        }
-        ui.toast(cancelled ? 'Download cancelled' : r.failed ? 'Saved with ' + r.failed + ' missing tiles' : 'Area saved for offline use');
-        if (box.isConnected) { render(); drawRects(); } // the user may have left the map page while it downloaded
-      }, function (e) { job = null; ui.toast(e.message); if (box.isConnected) render(); });
-    }
-    ctl.map.on('moveend zoomend', function () { if (!job && box.isConnected) { var est = ui.$('[data-est]', box); if (est) render(); } });
-    var sb = ui.$('[data-base]', view); if (sb) sb.addEventListener('click', function () { setTimeout(function () { if (!job && box.isConnected) render(); }, 0); });
-    purgeSavedOsm().then(function (n) { if (n && box.isConnected) { render(); drawRects(); } });
-    drawRects(); render();
+  function offlineCard(view) {
+    var box = ui.$('[data-offline-card]', view);
+    purgeSaved();
+    box.innerHTML = '<div class="card-title">' + icon('i-wifi-off') + 'Offline maps</div>' +
+      '<p class="small muted">Without signal the map still opens with a built-in world outline (coastlines and borders), and you can pick points on it. Map and satellite areas you viewed recently stay available on this device.</p>' +
+      '<p class="small muted">Downloading whole areas in advance is not offered: the open map services MEIKO uses do not allow it.</p>';
   }
 
   /* ---------- Map page (also the Track planner) ---------- */
@@ -557,7 +416,7 @@
         '<div class="card-title">' + icon('i-info') + 'About the map</div>' +
         '<ul class="list small">' +
         '<li><div class="grow"><b>Street map</b><small>OpenStreetMap contributors (ODbL).</small></div></li>' +
-        '<li><div class="grow"><b>Satellite</b><small>Esri World Imagery. Imagery dates vary by area.</small></div></li>' +
+        '<li><div class="grow"><b>Satellite</b><small>EOxCloudless 2016: Copernicus Sentinel-2 cloud-free mosaic (2016–2017, 10 m), CC BY 4.0. Harbours and new buildings may be missing.</small></div></li>' +
         '<li><div class="grow"><b>Sea marks</b><small>OpenSeaMap, community data. Coverage is incomplete.</small></div><span class="badge warn">not official</span></li>' +
         '<li><div class="grow"><b>Ports on the map</b><small>Sample positions, not yet verified.</small></div><span class="badge warn">unverified</span></li>' +
         '<li><div class="grow"><b>Offline outline</b><small>Natural Earth 1:50 m coastlines and borders, built in. Small islands and harbours are simplified or missing.</small></div><span class="badge info">approx.</span></li>' +

@@ -4,7 +4,7 @@
  * cache-first with a background refresh ("stale-while-revalidate") for same-origin GET requests.
  * Bump CACHE_VERSION whenever any file changes so clients pick up the new version.
  */
-var CACHE_VERSION = 'meiko-v1.15.0';
+var CACHE_VERSION = 'meiko-v1.16.0';
 var ASSETS = [
   './', 'index.html', 'js/theme-boot.js', 'manifest.json', 'css/style.css',
   'assets/icons/icon.svg', 'assets/icons/icon-192.png', 'assets/icons/icon-512.png', 'assets/icons/icon-maskable-512.png', 'assets/icons/apple-touch-icon.png', 'assets/icons/logo-round.png', 'assets/icons/logo-full.jpg',
@@ -19,9 +19,9 @@ var ASSETS = [
 ];
 
 /* Map tiles (third-party hosts). Cache-first so viewed and saved areas work offline.
- * 'tiles-saved-v1' is filled by "Save area for offline" in the app and kept until the user deletes it.
+ * 'tiles-saved-v1' was filled by "Save area for offline" before v1.16; the app now deletes it.
  * 'tiles-seen-v1' keeps tiles as they are viewed, trimmed to the newest SEEN_MAX entries. */
-var TILE_HOSTS = ['tile.openstreetmap.org', 'server.arcgisonline.com', 'tiles.openseamap.org'];
+var TILE_HOSTS = ['tile.openstreetmap.org', 'tiles.maps.eox.at', 'tiles.openseamap.org'];
 var SEEN_CACHE = 'tiles-seen-v1', SAVED_CACHE = 'tiles-saved-v1', SEEN_MAX = 2000;
 var trimPending = false;
 function trimSeen() {

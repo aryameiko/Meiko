@@ -55,7 +55,7 @@ External accuracy is estimated as HDOP × 5 m. Checksums are verified; bad sente
 
 - **Layers:**
   - Street map: OpenStreetMap
-  - Satellite: Esri World Imagery, plus a place-name overlay
+  - Satellite: EOxCloudless 2016 (Copernicus Sentinel-2 mosaic, CC BY 4.0); no place-name overlay
   - Sea marks: OpenSeaMap
   - Offline: a world outline that ships with the app (Natural Earth 1:50m, public domain; via world-atlas, rendered with topojson-client)
 - **Picking a point:** tap the map to see the point in DD, DDM and DMS. From there you can copy it, save it, open it in Google Maps or Google Earth (links only), or send it to Distance, Rhumb, Course, Coordinates, Qibla, Sun, Merpass or Maghrib. Every coordinate field also has a **Map** chip that opens a picker sheet.
@@ -66,7 +66,7 @@ External accuracy is estimated as HDOP × 5 m. Checksums are verified; bad sente
   - *Save visible area* downloads the visible satellite area (plus sea marks if on) into `tiles-saved-v1` and keeps it until it is deleted. It saves a few zoom levels, capped at zoom 16 and 4000 tiles, two requests at a time. Since v1.12 the OpenStreetMap street map is never bulk-saved, because the OSMF tile usage policy forbids "download for offline" on tile.openstreetmap.org; OSM tiles saved by older versions are purged once.
   - With no signal the built-in outline is always available.
 - **Provider hook:** `MEIKO.map.addBaseLayer({ id, label, create(L) })` adds another base layer, for example Google Map Tiles once a key exists.
-- **Terms:** check the Esri imagery and OSM tile terms before commercial or high-traffic use. Self-hosted or paid tiles may be needed then.
+- **Terms (v1.16):** only openly licensed sources. OSM tiles: viewing only, no bulk download (OSMF tile policy). EOX: free WMTS, CC BY 4.0 for 2016; offline copies are a paid EOX product, so no "save area". Self-hosted tiles would be needed for heavy traffic.
 
 ## Track planner (v1.4)
 
@@ -194,20 +194,18 @@ Paste the Firebase web config into `js/firebase-config.js` (`MEIKO.FIREBASE_CONF
 
 **Course & Bearing** has a map under the two positions. Tap the map to set A (departure) and then B (destination), or type the positions. The map shows the great circle (solid, with direction arrows), the rhumb line (dashed), the initial course at A and the final bearing at B. It works offline on the bundled outline map.
 
-## Port distance tables (v1.8)
+## Port sea distances (v1.16: computed, no third-party tables)
 
-**Port-to-Port** shows an estimated sea distance from distance tables supplied by the user: the 2026 combined update (54 ports, `.xlsx`, used first), then the older western (22 ports) and eastern (38 ports) PDF tables for pairs the update does not cover. The UI deliberately shows no table names (the app is for public use). The data are in `js/data/distance-tables.js`, transcribed exactly from the PDFs, and the lookup and routing code is in `js/core/seadist.js`. The straight-line distance and bearings are shown alongside.
+**Port-to-Port** shows an estimated sea distance computed by MEIKO itself. `tools/sea-distances.js` rasterises the Natural Earth 1:10m land polygons (public domain, via the world-atlas package) on a 0.5′ grid, finds the shortest water path between every pair of ports with Dijkstra (16 neighbours, true cos-latitude scale) and writes `js/data/distance-tables.js`. Ports are snapped to the nearest open-sea cell and the snap distance is added; river ports are measured from the nearest coast, so their figures are rough. The figures ignore depth, reefs, traffic separation schemes and islands missing at 1:10m. Compared with published tables they come out a few percent shorter on average, because real routes follow fairways. Regenerate after changing ports: `npm pack world-atlas@2.0.2`, then `node tools/sea-distances.js package/land-10m.json` (about 6 minutes). The distance tables used up to v1.15 were removed because their publication rights were unclear. Lookup and routing code is in `js/core/seadist.js`; the straight-line distance and bearings are shown alongside.
 
-- **Errors are shown, not corrected.** Where the table's two directions differ, both figures are shown. A figure shorter than the straight line between the ports is marked *doubtful*. Pairs missing from the tables are estimated by chaining table legs and labelled as estimates.
 - **Port positions (v1.8.4).** Positions are taken from published harbour points, in this order: the SMDG Terminal Code List, the Kemenhub/Dephub port point datasets, then the NGA World Port Index (1′ precision). Each record's `source` names where its position came from. Ranai, Teluk Ratai, Miangas and Dili have no source point and remain MEIKO estimates (`source: null`). A test checks that no port lies more than 4 km inland of the Natural Earth 10 m coastline (river ports such as Palembang, Pontianak and Banjarmasin are exempt). The offline base map is coarse, so at low zoom a harbour can still appear to sit on land.
-- **Unidentified codes.** P. Gundul, BLP, MAS and the eastern table's NATUNA could not be identified, so they have no position.
 
 ## Privacy, terms and licences (v1.12)
 
 - `privacy.html` (Kebijakan Privasi, written against UU PDP No. 27/2022) and `terms.html` (Syarat Penggunaan) are plain public pages, so they can be linked from the Google OAuth consent screen. The app shows the same text from those files (`js/modules/legal.js`, tools `privacy`, `terms`, `licenses` under Settings). Both are in Bahasa Indonesia.
 - Onboarding requires a consent tick (age 18+ or parental consent, policy, terms, storage in Firebase outside Indonesia) before Google or email sign-up. It is saved in the profile as `consent: { v, at, age18 }`. When `MEIKO.legal.VERSION` changes, signed-in users must agree again.
 - Settings → Account → **Delete account** re-authenticates (password or Google), deletes the Firebase user (`deleteUser`), and wipes local storage, the Fleet file store and saved map tiles. The Firebase bundle now also exports `deleteUser`, `reauthenticateWithCredential`, `reauthenticateWithPopup` and `EmailAuthProvider`.
-- Not legal advice. Owner actions still open: PSE registration (Komdigi/OSS) if required, a contact email in the policy, the policy URL in the Google OAuth consent screen, Esri terms for satellite tiles, and confirming the TNI AL distance tables may be published.
+- Not legal advice. Owner actions still open: PSE registration (Komdigi/OSS) if required, a contact email in the policy, the policy URL in the Google OAuth consent screen. Since v1.16 the satellite layer is EOxCloudless 2016 (CC BY 4.0) and the sea distances are computed by MEIKO, so no third-party map or distance licence is outstanding; the source of the port positions is still to be settled.
 
 ## Accuracy & data status
 

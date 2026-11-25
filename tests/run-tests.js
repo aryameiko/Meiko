@@ -507,27 +507,22 @@ test('Distance tables: square matrices, empty diagonal, every key has a place en
     t.keys.forEach(function (k) { assert.ok(distT.PLACES[k], k); var pid = distT.PLACES[k].port; if (pid) assert.ok(ports.byId(pid), pid); });
   });
 });
-test('Distance tables: spot checks against the PDFs', function () {
-  var S = seadist.create(distT);
-  var w = function (a, b) { return S.pair(a, b).filter(function (e) { return e.table === 'wilbar'; })[0]; }, t = function (a, b) { return S.pair(a, b).filter(function (e) { return e.table === 'wiltim'; })[0]; };
-  assert.strictEqual(w('tpriok', 'lampung').ab, 168); assert.strictEqual(w('malahayati', 'tpriok').ab, 1148); assert.strictEqual(w('tpriok', 'malahayati').ab, 1144);
-  assert.strictEqual(w('panjang', 'tratai').ab, 18); assert.strictEqual(w('dumai', 'panjang').ab, 1592);
-  assert.strictEqual(t('surabaya', 'banjarmasin').ab, 250); assert.strictEqual(t('tpinang', 'tguban').ab, 12);
-  assert.strictEqual(t('dili', 'kendari').ab, 3451); assert.strictEqual(t('kendari', 'dili').ab, 3451); assert.strictEqual(t('kendari', 'ambon').ab, 345);
-  assert.strictEqual(t('jayapura', 'biak').ab, 315); assert.strictEqual(t('makassar', 'balikpapan').ab, 325);
+test('Computed sea distances: every port pair reachable, symmetric, never shorter than the straight line', function () {
+  var t = distT.TABLES[0], co = {}; ports.all().forEach(function (p) { co[p.id] = p; });
+  assert.strictEqual(distT.TABLES.length, 1); assert.strictEqual(t.id, 'computed');
+  assert.strictEqual(t.keys.length, ports.all().filter(function (p) { return p.lat > -14 && p.lat < 10 && p.lon > 92 && p.lon < 143; }).length);
+  t.keys.forEach(function (a, i) { t.keys.forEach(function (b, j) {
+    if (i === j) return; var v = t.rows[i][j]; assert.ok(typeof v === 'number', a + '–' + b);
+    assert.strictEqual(v, t.rows[j][i], 'symmetric ' + a + '–' + b);
+    var g = geo.haversine(co[a].lat, co[a].lon, co[b].lat, co[b].lon) / 1852; assert.ok(v >= g * 0.97, a + '–' + b + ' ' + v + ' < ' + g.toFixed(0));
+  }); });
 });
-test('Distance table 2026 update (xlsx): 54 ports, spot checks', function () {
-  var t = distT.TABLES[0], S = seadist.create(distT), m = function (a, b) { return S.pair(a, b).filter(function (e) { return e.table === 'main'; })[0]; };
-  assert.strictEqual(t.id, 'main'); assert.strictEqual(t.keys.length, 54);
-  assert.strictEqual(m('surabaya', 'semarang').ab, 201); assert.strictEqual(m('tpriok', 'cilegon').ab, 72.7); assert.strictEqual(m('sibolga', 'balikpapan').ab, 1637.5);
-  assert.strictEqual(m('makassar', 'kendari').ab, 460); assert.strictEqual(m('ranai', 'pontianak').ab, 260); assert.strictEqual(m('jayapura', 'sorong').ab, 629);
-});
-test('Sea distance: implausible figure flagged, route estimate through table legs', function () {
-  var co = {}; ports.all().forEach(function (p) { co[p.id] = p; });
-  var S = seadist.create(distT, function (a, b) { var A = co[distT.PLACES[a].port], B = co[distT.PLACES[b].port]; return A && B ? geo.haversine(A.lat, A.lon, B.lat, B.lon) / 1852 : null; });
-  var e = S.pair('tpriok', 'ambon').filter(function (x) { return x.table === 'wiltim'; })[0]; assert.strictEqual(e.ab, 353); assert.ok(!e.okAB, 'TPK–AMB 353 NM < straight line');
-  var r = S.route('nias', 'nabire'); assert.ok(r && r.path.length >= 3 && r.nm > 2000, JSON.stringify(r));
-  assert.ok(S.neighbours('surabaya').length >= 37);
+test('Computed sea distances: spot checks against well-known passages (±8 %)', function () {
+  var S = seadist.create(distT), c = function (a, b, nm) { var v = S.best(a, b); assert.ok(Math.abs(v - nm) / nm < 0.08, a + '–' + b + ' ' + v + ' vs ' + nm); };
+  c('id-tpriok', 'id-tperak', 390); c('id-tperak', 'id-makassar', 440); c('id-tpriok', 'id-belawan', 830);
+  c('id-tperak', 'id-banjarmasin', 260); c('id-makassar', 'id-bpn', 300); c('id-jayapura', 'id-biak', 320);
+  assert.ok(S.neighbours('id-tperak').length >= 60);
+  assert.ok(distT.PLACES['id-tperak'].aliases.indexOf('SBY') !== -1, 'search aliases kept');
 });
 
 /* ---------- Port positions vs coastline (gross-error check) ---------- */
