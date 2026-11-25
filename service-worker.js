@@ -4,13 +4,13 @@
  * cache-first with a background refresh ("stale-while-revalidate") for same-origin GET requests.
  * Bump CACHE_VERSION whenever any file changes so clients pick up the new version.
  */
-var CACHE_VERSION = 'meiko-v1.13.2';
+var CACHE_VERSION = 'meiko-v1.14.0';
 var ASSETS = [
   './', 'index.html', 'js/theme-boot.js', 'manifest.json', 'css/style.css',
   'assets/icons/icon.svg', 'assets/icons/icon-192.png', 'assets/icons/icon-512.png', 'assets/icons/icon-maskable-512.png', 'assets/icons/apple-touch-icon.png', 'assets/icons/logo-round.png', 'assets/icons/logo-full.jpg',
   'js/firebase-config.js', 'js/vendor/firebase-auth.js', 'js/auth.js', 'js/onboarding.js', 'js/modules/account.js', 'js/modules/legal.js', 'privacy.html', 'terms.html', 'css/legal.css', 'js/core/geo.js', 'js/core/coords.js', 'js/core/units.js', 'js/core/navcalc.js', 'js/core/solar.js', 'js/core/prayer.js', 'js/core/qibla.js', 'js/core/calc.js', 'js/core/nmea.js', 'js/core/track.js', 'js/core/wmm.js', 'js/core/livenav.js', 'js/core/celestial.js', 'js/core/platesolve.js', 'js/core/seadist.js', 'js/core/fleet.js', 'js/vendor/nostr-crypto.js',
   'js/data/ports-data.js', 'js/data/stars-data.js', 'js/data/distance-tables.js',
-  'js/i18n.js', 'js/storage.js', 'js/settings.js', 'js/features.js', 'js/ui.js', 'js/gps.js',
+  'js/i18n.js', 'js/region.js', 'js/lang/strings.js', 'js/lang/id.js', 'js/lang/ms.js', 'js/lang/tl.js', 'js/lang/vi.js', 'js/lang/th.js', 'js/lang/zh.js', 'js/storage.js', 'js/settings.js', 'js/features.js', 'js/ui.js', 'js/gps.js',
   'js/modules/navigation.js', 'js/modules/calculator.js', 'js/modules/converter.js', 'js/modules/astronomy.js',
   'js/modules/prayer.js', 'js/modules/qibla.js', 'js/modules/position.js', 'js/modules/settings.js', 'js/modules/vessel.js', 'js/modules/track.js', 'js/modules/livenav.js', 'js/modules/stars.js', 'js/modules/map.js', 'js/modules/fleet.js',
   'js/app.js',

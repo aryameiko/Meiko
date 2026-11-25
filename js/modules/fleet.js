@@ -386,14 +386,14 @@
     if (st.noticing || document.querySelector('.sheet-backdrop')) return;
     st.noticing = true;
     setShare(true);
-    ui.sheet({ title: 'Kapal Anda terlihat di peta', html:
-      '<p>Semua kapal pengguna MEIKO yang sedang online kini <b>otomatis saling terlihat</b> di Peta dan Fleet &amp; Chat, tanpa kode grup.</p>' +
-      '<p>Yang terlihat oleh pengguna lain: <b>posisi, haluan (COG), kecepatan (SOG), nama panggilan, dan avatar kapal</b> Anda, diperbarui tiap 30 detik selama MEIKO terbuka. Email Anda tidak pernah ditampilkan.</p>' +
-      '<p class="small muted">Anda bisa menyembunyikan posisi kapan saja di Fleet &amp; Chat → <i>Share my position</i>. Chat pribadi terenkripsi ujung ke ujung. Lihat <a href="privacy.html" target="_blank" rel="noopener">Kebijakan Privasi</a>.</p>' +
-      '<div class="actions"><button class="btn btn-primary" data-ok>' + icon('i-check') + 'Mengerti</button><button class="btn btn-ghost" data-hide>Sembunyikan posisi saya</button></div>',
+    ui.sheet({ title: 'Your vessel is visible on the map', html:
+      '<p>All MEIKO vessels that are online now see each other automatically on the Map and in Fleet &amp; Chat, without a group code.</p>' +
+      '<p>Other users see your position, course (COG), speed (SOG), nickname and vessel avatar, updated every 30 seconds while MEIKO is open. Your email is never shown.</p>' +
+      '<p class="small muted">You can hide your position at any time in Fleet &amp; Chat → Share my position. Private chats are end-to-end encrypted. See the <a href="privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.</p>' +
+      '<div class="actions"><button class="btn btn-primary" data-ok>' + icon('i-check') + 'Got it</button><button class="btn btn-ghost" data-hide>Hide my position</button></div>',
       onMount: function (body, close) {
         ui.$('[data-ok]', body).addEventListener('click', function () { close(); });
-        ui.$('[data-hide]', body).addEventListener('click', function () { close(); setShare(false); ui.toast('Posisi Anda disembunyikan. Kapal lain tetap terlihat oleh Anda.'); });
+        ui.$('[data-hide]', body).addEventListener('click', function () { close(); setShare(false); ui.toast('Your position is hidden. You still see the other vessels.'); });
       },
       onClose: function () { st.noticing = false; saveCfg({ shareAsked: true }); } });
   }
@@ -619,11 +619,11 @@
         var key = m.from + ':' + a.fid, pr = st.prog[key], mt = safeMime(a.mime), img = /^image\//.test(mt), vid = /^video\//.test(mt), med = img || vid;
         var ratio = med && a.w && a.h ? ' style="aspect-ratio:' + a.w + '/' + a.h + '"' : '';
         return '<div class="att' + (img ? ' att-img' : vid ? ' att-img att-vid' : ' att-file') + '" data-att="' + esc(key) + '" data-name="' + esc(a.name) + '" data-mime="' + esc(mt) + '"' + ratio + '>' +
-          (vid ? '<span class="att-vlabel">' + icon('i-video') + Math.max(1, Math.round(a.size / 1024)) + ' KB</span>' : img ? '' : icon('i-file') + '<span><b>' + esc(a.name) + '</b><small>' + Math.max(1, Math.round(a.size / 1024)) + ' KB</small></span>') +
+          (vid ? '<span class="att-vlabel">' + icon('i-video') + Math.max(1, Math.round(a.size / 1024)) + ' KB</span>' : img ? '' : icon('i-file') + '<span><b translate="no">' + esc(a.name) + '</b><small>' + Math.max(1, Math.round(a.size / 1024)) + ' KB</small></span>') +
           '<small class="att-state">' + (pr != null ? 'Receiving… ' + Math.round(pr * 100) + '%' : 'Loading…') + '</small></div>';
       }
       function msgHTML(m, showName) {
-        return '<div class="msg' + (m.me ? ' me' : '') + '"><div class="msg-meta">' + (m.me ? 'You' : (m.from ? '<button type="button" class="msg-who" data-who="' + esc(m.from) + '">' + esc(m.name) + '</button>' : esc(m.name)) + (showName && m.from ? ' · ID ' + C.fleet.shortId(m.from) : '')) + ' · ' + esc(ui.time(m.at)) + (Date.now() - m.at > 86400000 ? ' · ' + esc(ui.date(m.at)) : '') + '</div>' + attHTML(m) + (m.text ? '<div class="msg-text">' + esc(m.text) + '</div>' : '') + '</div>';
+        return '<div class="msg' + (m.me ? ' me' : '') + '"><div class="msg-meta">' + (m.me ? 'You' : (m.from ? '<button type="button" class="msg-who" translate="no" data-who="' + esc(m.from) + '">' + esc(m.name) + '</button>' : esc(m.name)) + (showName && m.from ? ' · ID ' + C.fleet.shortId(m.from) : '')) + ' · ' + esc(ui.time(m.at)) + (Date.now() - m.at > 86400000 ? ' · ' + esc(ui.date(m.at)) : '') + '</div>' + attHTML(m) + (m.text ? '<div class="msg-text" translate="no">' + esc(m.text) + '</div>' : '') + '</div>';
       }
       function hydrate() {
         ui.$$('[data-att]', view).forEach(function (el) {

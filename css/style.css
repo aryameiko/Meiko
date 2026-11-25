@@ -787,3 +787,13 @@ body.onb-open .sheet-backdrop { z-index: 5100; }
 /* reCAPTCHA v3 badge: hidden because the sign-in screen shows the required notice instead (.onb-recaptcha). */
 .has-recaptcha .grecaptcha-badge { visibility: hidden !important; }
 .onb-recaptcha { margin-top: 12px; text-align: center; }
+
+/* Languages (v1.14) */
+html.i18n-wait body { visibility: hidden; }
+.onb-lang { justify-self: end; display: inline-flex; align-items: center; gap: 6px; padding: 4px 6px 4px 10px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--text-2); }
+.onb-lang .i { width: 18px; height: 18px; }
+.onb-lang select { border: 0; background: transparent; color: var(--text); font: inherit; font-weight: 600; padding: 4px 2px; min-height: 0; width: auto; box-shadow: none; }
+.country-stats { display: grid; gap: 6px; }
+.country-stats .row { display: grid; grid-template-columns: 1.6em 1fr auto; gap: 8px; align-items: center; }
+.country-stats .bar { grid-column: 2 / 4; height: 6px; border-radius: 3px; background: var(--surface-sunken); overflow: hidden; }
+.country-stats .bar i { display: block; height: 100%; background: var(--primary); }

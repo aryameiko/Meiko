@@ -7,8 +7,8 @@
 (function () {
   'use strict';
   var ui = MEIKO.ui, esc = ui.esc, icon = ui.icon;
-  var VERSION = '2026-11-25.1';
-  var DOCS = { privacy: { file: 'privacy.html', title: 'Kebijakan Privasi' }, terms: { file: 'terms.html', title: 'Syarat Penggunaan' } };
+  var VERSION = '2026-11-25.2';
+  var DOCS = { privacy: { file: 'privacy.html', title: 'Privacy Policy' }, terms: { file: 'terms.html', title: 'Terms of Use' } };
   var cache = {};
 
   function load(name) {
@@ -23,7 +23,10 @@
       return (cache[name] = m.outerHTML);
     });
   }
-  function fallback(name) { return '<p>' + esc(DOCS[name].title) + ' belum dapat dimuat (offline?). Buka <a href="' + DOCS[name].file + '" target="_blank" rel="noopener">' + DOCS[name].file + '</a> saat ada internet.</p>'; }
+  function fallback(name) { return '<p>' + esc(DOCS[name].title) + ' could not be loaded (offline?). Open <a href="' + DOCS[name].file + '" target="_blank" rel="noopener">' + DOCS[name].file + '</a> when you have internet.</p>'; }
+  /** The documents are written in Indonesian (the official version); say so in the other languages. */
+  function langNote() { return MEIKO.i18n && MEIKO.i18n.lang() !== 'id' ? '<p class="small muted">' + icon('i-info') + ' This document is available in Indonesian, which is the official version.</p>' : ''; }
+  var DOC_BOX = '<div data-doc translate="no" lang="id"><p class="small muted">Memuat…</p></div>';
   function wireLinks(root) {
     root.addEventListener('click', function (e) {
       var a = e.target.closest('[data-legal]'); if (!a) return;
@@ -32,7 +35,7 @@
   }
   /** Show a document in a sheet (works above the onboarding screen and offline once cached). */
   function show(name) {
-    ui.sheet({ title: DOCS[name].title, html: '<div data-doc><p class="small muted">Memuat…</p></div>', onMount: function (body) {
+    ui.sheet({ title: DOCS[name].title, html: langNote() + DOC_BOX, onMount: function (body) {
       var box = body.querySelector('[data-doc]');
       load(name).then(function (h) { box.innerHTML = h; }, function () { box.innerHTML = fallback(name); });
       wireLinks(body);
@@ -43,7 +46,7 @@
   function recordConsent() { return MEIKO.auth.setConsent({ v: VERSION, at: new Date().toISOString(), age18: true }); }
   /** The consent checkbox used in onboarding (both for Google and email sign-up). */
   function checkboxHTML(checked) {
-    return '<label class="legal-check"><input type="checkbox" data-consent' + (checked ? ' checked' : '') + '> <span>Saya berusia 18 tahun ke atas (atau mendapat izin orang tua/wali) dan menyetujui <a href="privacy.html" data-legal="privacy">Kebijakan Privasi</a> serta <a href="terms.html" data-legal="terms">Syarat Penggunaan</a> MEIKO, termasuk penyimpanan akun di Firebase (Google) di luar Indonesia.</span></label>';
+    return '<label class="legal-check"><input type="checkbox" data-consent' + (checked ? ' checked' : '') + '> <span>I am 18 or older (or have permission from a parent or guardian) and I agree to the MEIKO <a href="privacy.html" data-legal="privacy">Privacy Policy</a> and <a href="terms.html" data-legal="terms">Terms of Use</a>, including storage of my account, country and language on Firebase (Google) outside Indonesia.</span></label>';
   }
 
   MEIKO.legal = { VERSION: VERSION, load: load, show: show, consent: consent, recordConsent: recordConsent, checkboxHTML: checkboxHTML, wireLinks: wireLinks };
@@ -52,8 +55,8 @@
     MEIKO.features.register({
       id: name, cat: 'settings', order: order, icon: ico, title: DOCS[name].title, desc: desc, keywords: keywords,
       render: function (view) {
-        view.innerHTML = ui.pageHead(this) + '<div class="card card-pad" data-doc><p class="small muted">Memuat…</p></div>' +
-          '<p class="small muted mt-8"><a href="' + DOCS[name].file + '" target="_blank" rel="noopener">Buka sebagai halaman web</a></p>';
+        view.innerHTML = ui.pageHead(this) + langNote() + '<div class="card card-pad" data-doc translate="no" lang="id"><p class="small muted">Memuat…</p></div>' +
+          '<p class="small muted mt-8"><a href="' + DOCS[name].file + '" target="_blank" rel="noopener">Open as a web page</a></p>';
         var box = ui.$('[data-doc]', view);
         load(name).then(function (h) { if (box.isConnected) box.innerHTML = h; }, function () { box.innerHTML = fallback(name); });
         wireLinks(view);

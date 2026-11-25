@@ -87,14 +87,24 @@
   var MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   var DOW_LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   var MON_LONG = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  /** Dates in the chosen language (Intl), English names as the fallback. */
+  function intlDate(d, long) {
+    var L = MEIKO.i18n && MEIKO.i18n.lang();
+    if (!L || L === 'en' || !window.Intl || !Intl.DateTimeFormat) return null;
+    try {
+      return new Intl.DateTimeFormat(MEIKO.i18n.locale(), long ? { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' } : { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(d);
+    } catch (e) { return null; }
+  }
   function date(utcMs, tz, long) {
     if (utcMs == null || !isFinite(utcMs)) return '—';
-    var d = shifted(utcMs, tz == null ? S('tz') : tz);
+    var d = shifted(utcMs, tz == null ? S('tz') : tz), loc = intlDate(d, long);
+    if (loc) return loc;
     if (long) return DOW_LONG[d.getUTCDay()] + ', ' + d.getUTCDate() + ' ' + MON_LONG[d.getUTCMonth()] + ' ' + d.getUTCFullYear();
     return DOW[d.getUTCDay()] + ' ' + d.getUTCDate() + ' ' + MON[d.getUTCMonth()] + ' ' + d.getUTCFullYear();
   }
   function dateYMD(ymd) { // {y,m,d} → "Mon 23 Nov 2026"
-    var d = new Date(Date.UTC(ymd.y, ymd.m - 1, ymd.d));
+    var d = new Date(Date.UTC(ymd.y, ymd.m - 1, ymd.d)), loc = intlDate(d, false);
+    if (loc) return loc;
     return DOW[d.getUTCDay()] + ' ' + ymd.d + ' ' + MON[ymd.m - 1] + ' ' + ymd.y;
   }
   function tzLabel(tz) {

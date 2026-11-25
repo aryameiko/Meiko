@@ -4,7 +4,7 @@
  */
 (function () {
   'use strict';
-  MEIKO.VERSION = '1.13.2';
+  MEIKO.VERSION = '1.14.0';
   var ui = MEIKO.ui, F = MEIKO.features, icon = ui.icon, C = window.MeikoCore;
   var view = ui.$('#view'), cleanup = null, clockTimer = null, deferredInstall = null;
 
@@ -67,7 +67,7 @@
       MEIKO.storage.set('recent', [route.tool].concat((MEIKO.storage.get('recent', []) || []).filter(function (x) { return x !== route.tool; })).slice(0, 4));
     } else renderHome();
     ui.$('#pageTitle').textContent = route.name === 'home' ? 'MEIKO' : title;
-    document.title = (route.name === 'home' ? 'MEIKO — Navigate • Calculate • Explore' : title + ' · MEIKO');
+    document.title = route.name === 'home' ? 'MEIKO — Navigate • Calculate • Explore' : MEIKO.i18n.tr(title) + ' · MEIKO';
     ui.$('#backBtn').hidden = route.name === 'home';
     ui.$('#brandMini').style.display = route.name === 'home' ? '' : 'none';
     setActive(route);

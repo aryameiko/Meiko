@@ -13,12 +13,13 @@
 
   MEIKO.features.register({
     id: 'settings', cat: 'settings', icon: 'i-settings', title: 'Settings',
-    desc: 'Theme, units, time format, coordinates, time zone, saved places', keywords: 'pengaturan preferences dark mode theme about',
+    desc: 'Theme, units, time format, coordinates, time zone, saved places', keywords: 'pengaturan preferences dark mode theme about bahasa language idioma',
     render: function (view) {
       var s = set.get();
       view.innerHTML = ui.pageHead({ cat: 'settings', title: 'Settings', lead: 'Preferences are stored only on this device.' }) +
         '<div class="tool-grid"><div class="stack">' +
         '<div class="card card-pad form-gap"><div class="card-title">' + icon('i-sun') + 'Appearance</div>' +
+        '<label class="field"><span>' + icon('i-globe') + ' Language</span><select data-langsel>' + MEIKO.region.langOptions(MEIKO.i18n.lang()) + '</select><small class="hint" translate="no">Bahasa · Language · Ngôn ngữ · ภาษา · 语言</small></label>' +
         '<div class="field"><span>Theme</span>' + seg('theme', [['system', 'System'], ['light', 'Light'], ['dark', 'Dark']], s.theme) + '</div></div>' +
         '<div class="card card-pad form-gap"><div class="card-title">' + icon('i-ruler') + 'Units & formats</div>' +
         '<div class="field"><span>Default distance unit</span>' + seg('distUnit', [['nm', 'Nautical miles'], ['km', 'Kilometres']], s.distUnit) + '</div>' +
@@ -61,6 +62,11 @@
       function ex() { ui.$('[data-coord-ex]', view).textContent = 'Example: ' + ui.coordPair(-6.10417, 106.88); }
       ex();
       MEIKO.app.mountPermission(ui.$('[data-perm-s]', view));
+      ui.$('[data-langsel]', view).addEventListener('change', function (e) {
+        set.set('lang', e.target.value);
+        if (MEIKO.auth.profile() && MEIKO.auth.profile().country) MEIKO.auth.setRegion(MEIKO.auth.profile().country, e.target.value);
+        MEIKO.i18n.onReady(function () { ui.toast('Saved'); });
+      });
       ui.$('[data-tz]', view).addEventListener('change', function (e) { set.set('tz', +e.target.value); ui.toast('Time zone saved'); });
 
       var savedEl = ui.$('[data-saved]', view);

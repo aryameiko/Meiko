@@ -10,9 +10,9 @@
   <link rel="stylesheet" href="css/legal.css">
 </head>
 <body>
-<main id="legal" class="legal" data-legal-version="2026-11-25.1">
+<main id="legal" class="legal" data-legal-version="2026-11-25.2">
 <h1>Kebijakan Privasi MEIKO</h1>
-<p class="legal-meta">Berlaku sejak 25 November 2026 · Versi 2026-11-25.1 (perlindungan dari bot)</p>
+<p class="legal-meta">Berlaku sejak 25 November 2026 · Versi 2026-11-25.2 (negara dan bahasa pengguna)</p>
 
 <p>Kebijakan ini menjelaskan data pribadi apa yang diproses aplikasi MEIKO (situs <b>aryameiko.github.io/Meiko</b> dan aplikasi yang dipasang darinya), untuk apa, ke mana data itu dikirim, berapa lama disimpan, dan apa hak Anda. Kebijakan ini disusun dengan mengacu pada Undang-Undang Nomor 27 Tahun 2022 tentang Pelindungan Data Pribadi (UU PDP).</p>
 
@@ -26,6 +26,7 @@
   <li>Setelah masuk, MEIKO otomatis bergabung ke <b>Armada Publik</b> Fleet &amp; Chat: nama panggilan, avatar kapal, serta <b>posisi, haluan, dan kecepatan</b> kapal Anda terlihat oleh pengguna MEIKO lain yang sedang online. Berbagi posisi <b>aktif secara bawaan</b> dan bisa Anda matikan kapan saja (sakelar “Share my position”, atau “Sembunyikan posisi saya” saat pemberitahuan pertama).</li>
   <li><b>General Group</b> adalah ruang chat terbuka untuk semua pengguna MEIKO, tanpa kode. Anda hanya masuk jika memilih “Join General Group”. Isinya <b>tidak rahasia</b> dan dapat dibaca semua pengguna MEIKO.</li>
   <li><b>Chat pribadi</b> dengan kapal lain <b>dienkripsi ujung ke ujung</b>; hanya Anda dan lawan bicara yang bisa membacanya.</li>
+  <li>Saat mendaftar Anda memilih <b>negara</b> dan <b>bahasa aplikasi</b>. Keduanya disimpan bersama ID akun Anda di <b>Cloud Firestore</b> agar pengembang tahu dari negara mana saja MEIKO dipakai dan bahasa apa yang perlu didukung. Data ini tidak terlihat oleh pengguna lain.</li>
   <li>MEIKO <b>tidak</b> memakai iklan, pelacak analitik, atau menjual data.</li>
 </ul>
 
@@ -34,6 +35,7 @@
   <thead><tr><th>Data</th><th>Tujuan</th><th>Dasar pemrosesan</th><th>Disimpan di</th></tr></thead>
   <tbody>
     <tr><td>Alamat email, kata sandi (disimpan Firebase dalam bentuk hash), ID pengguna, waktu daftar dan masuk. Jika memakai Google: nama, email, dan foto profil Google yang dikirim Google.</td><td>Membuat akun, masuk, mengatur ulang kata sandi, mencegah penyalahgunaan.</td><td>Persetujuan Anda dan pelaksanaan perjanjian (Syarat Penggunaan).</td><td>Firebase (Google LLC) dan perangkat Anda.</td></tr>
+    <tr><td>Negara dan bahasa aplikasi yang Anda pilih, bersama ID pengguna serta waktu daftar dan perubahan terakhir.</td><td>Statistik negara asal pengguna dan bahasa yang dipakai, untuk mengembangkan MEIKO (misalnya bahasa baru). Hanya pengembang yang dapat melihatnya; tidak ditampilkan kepada pengguna lain dan tidak dipakai untuk iklan.</td><td>Persetujuan.</td><td>Cloud Firestore (Google LLC), dokumen <code>users/&lt;ID pengguna&gt;</code>, dan perangkat Anda. Bisa diubah di Pengaturan → Akun.</td></tr>
     <tr><td>Nama panggilan (nickname) dan avatar kapal (jenis, warna, nama kapal, tanda panggil, pelabuhan asal).</td><td>Menampilkan identitas Anda di aplikasi dan kepada pengguna MEIKO lain yang online di Armada Publik (atau anggota grup privat yang Anda masuki).</td><td>Persetujuan.</td><td>Perangkat Anda; dikirim lewat relay ke Armada Publik selama MEIKO terbuka, kecuali Anda memilih “Go offline” di Fleet &amp; Chat.</td></tr>
     <tr><td>Lokasi GPS, haluan dan kecepatan, kompas.</td><td>Fitur navigasi, peta, kiblat, waktu salat (diproses di perangkat), dan menampilkan kapal Anda kepada pengguna MEIKO lain di Armada Publik.</td><td>Persetujuan (izin lokasi di browser/HP, bisa dicabut kapan saja).</td><td>Perangkat Anda. Selama MEIKO terbuka dan “Share my position” menyala (bawaan), posisi dikirim ke Armada Publik dan terlihat oleh semua pengguna MEIKO yang online.</td></tr>
     <tr><td>Rute, titik jalan, tempat tersimpan, area peta offline, pengaturan.</td><td>Menjalankan fitur yang Anda pakai.</td><td>Persetujuan / pelaksanaan perjanjian.</td><td>Perangkat Anda saja.</td></tr>
@@ -47,7 +49,7 @@
 <h2>4. Pihak ketiga yang menerima data</h2>
 <ul>
   <li><b>Google LLC – reCAPTCHA dan Firebase App Check</b> (pemroses data): memeriksa bahwa yang mendaftar, masuk, dan mengambil kunci Armada Publik adalah aplikasi MEIKO asli yang dipakai manusia, bukan bot. Untuk itu Google menerima data teknis perangkat dan peramban (misalnya alamat IP, jenis peramban, dan interaksi di halaman). <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Kebijakan Privasi</a> dan <a href="https://policies.google.com/terms" target="_blank" rel="noopener">Persyaratan Layanan</a> Google berlaku.</li>
-  <li><b>Google LLC – Cloud Firestore</b> (pemroses data): menyimpan kunci Armada Publik yang hanya bisa dibaca akun MEIKO yang sudah masuk. Tidak ada data pribadi Anda yang disimpan di sana.</li>
+  <li><b>Google LLC – Cloud Firestore</b> (pemroses data): menyimpan kunci Armada Publik yang hanya bisa dibaca akun MEIKO yang sudah masuk, serta negara dan bahasa yang Anda pilih (dokumen milik akun Anda sendiri, hanya bisa ditulis oleh akun Anda dan dibaca oleh Anda dan pengembang). Server Google dapat berada di luar Indonesia.</li>
   <li><b>Google LLC – Firebase Authentication</b> (pemroses data): menyimpan akun. Server Google dapat berada di luar Indonesia, termasuk Amerika Serikat. <a href="https://firebase.google.com/support/privacy" target="_blank" rel="noopener">Privasi Firebase</a> · <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Kebijakan Privasi Google</a>.</li>
   <li><b>Relay Nostr publik</b> (bawaan: relay.damus.io, nos.lol, relay.primal.net, offchain.pub; Anda dapat menggantinya): meneruskan pesan dan posisi Fleet &amp; Chat. Relay ini dijalankan pihak independen di berbagai negara dan <b>bukan milik MEIKO</b>. Di grup privat, isi pesan, posisi, nama panggilan, dan lampiran dienkripsi dengan kode grup sebelum dikirim, sehingga relay tidak dapat membacanya. Kunci <b>Armada Publik</b> hanya diberikan kepada akun MEIKO yang sudah masuk (disimpan di Firebase Firestore, tidak ada di kode aplikasi), jadi orang tanpa akun MEIKO tidak dapat membaca posisi di sana. Namun semua pengguna MEIKO dapat melihat nama panggilan, kapal, dan posisi yang Anda bagikan di Armada Publik, jadi data itu <b>tidak rahasia</b>. Chat pribadi tetap dienkripsi ujung ke ujung. Relay tetap dapat melihat alamat IP, kunci publik perangkat, waktu, dan ukuran data. Pesan diberi masa berlaku 3 hari, tetapi kami tidak dapat menjamin setiap relay menghapusnya tepat waktu.</li>
   <li><b>Penyedia peta</b>: OpenStreetMap Foundation (peta jalan), Esri (citra satelit dan nama tempat), dan OpenSeaMap (rambu laut). Saat peta dimuat, server mereka menerima alamat IP Anda dan petak peta yang diminta (yang menunjukkan area yang sedang Anda lihat).</li>
@@ -61,6 +63,7 @@
 
 <h2>6. Berapa lama data disimpan</h2>
 <ul>
+  <li><b>Negara dan bahasa di Firestore</b>: sampai Anda menghapus akun; dokumen ini ikut dihapus saat Anda memakai Hapus akun.</li>
   <li><b>Akun Firebase</b>: sampai Anda menghapus akun (Pengaturan → Akun → Hapus akun) atau meminta penghapusan.</li>
   <li><b>Data di perangkat</b>: sampai Anda menghapusnya (Pengaturan → Hapus semua data lokal, hapus akun, atau hapus data situs di browser).</li>
   <li><b>Chat di relay</b>: diberi masa berlaku 3 hari; posisi langsung bersifat sementara (tidak disimpan relay yang patuh standar).</li>
@@ -70,10 +73,10 @@
 <p>Sesuai UU PDP, Anda berhak antara lain untuk: mendapat informasi tentang pemrosesan data; mengakses dan memperoleh salinan data; memperbaiki data yang salah; menghapus data dan mengakhiri pemrosesan; menarik kembali persetujuan; membatasi atau menunda pemrosesan; dan mengajukan keberatan atau gugatan sesuai peraturan.</p>
 <p>Cara memakai hak Anda:</p>
 <ul>
-  <li><b>Ubah nama panggilan atau kapal</b>: Pengaturan → Akun / Kapal Saya.</li>
+  <li><b>Ubah nama panggilan, kapal, negara, atau bahasa</b>: Pengaturan → Akun / Kapal Saya / Pengaturan.</li>
   <li><b>Berhenti membagikan posisi</b>: matikan “Share my position” di Fleet &amp; Chat. Untuk tidak terlihat sama sekali di Armada Publik, pilih “Go offline (leave the public fleet)”.</li>
   <li><b>Cabut izin lokasi/kamera</b>: lewat pengaturan browser atau HP.</li>
-  <li><b>Hapus akun dan data</b>: Pengaturan → Akun → <b>Hapus akun</b>. Ini menghapus akun Firebase Anda dan data MEIKO di perangkat ini.</li>
+  <li><b>Hapus akun dan data</b>: Pengaturan → Akun → <b>Hapus akun</b>. Ini menghapus akun Firebase Anda, data negara dan bahasa Anda di Firestore, dan data MEIKO di perangkat ini.</li>
   <li><b>Permintaan lain</b> (salinan data, keberatan, dll.): hubungi kami (bagian 1). Kami menjawab paling lambat 3 × 24 jam sejak permintaan diterima, sesuai UU PDP.</li>
 </ul>
 <p>Menarik persetujuan untuk akun berarti Anda tidak dapat lagi memakai fitur yang memerlukan akun.</p>

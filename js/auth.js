@@ -170,6 +170,45 @@
         throw e && e.message && !/Failed to fetch|NetworkError|Load failed/i.test(e.message) ? e : new Error('No internet connection: the public fleet needs internet the first time.');
       });
     },
+    /**
+     * Country and app language chosen at registration (Settings → Account to change). Kept in the profile on
+     * this device and in Firestore users/{uid} = { country, language, createdAt, updatedAt } so the owner can
+     * see where MEIKO is used. The security rules let each account write only its own document. If the write
+     * fails (offline) it is retried by syncRegion() when MEIKO opens or comes back online.
+     */
+    setRegion: function (country, language) {
+      var p = profile(); if (!p) return Promise.resolve(null);
+      save({ country: country, lang: language, regionSynced: false });
+      return syncRegion();
+    },
+    syncRegion: syncRegion,
+    /** After signing in on a new device: take the country/language already saved for this account, if any. */
+    loadRegion: function () {
+      var p = profile(); if (!p || !p.uid || active !== 'firebase') return Promise.resolve(null);
+      return fsFetch('users/' + encodeURIComponent(p.uid), { method: 'GET' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
+        var f = d && d.fields, c = f && f.country && f.country.stringValue, l = f && f.language && f.language.stringValue;
+        if (!c) return null;
+        save({ country: c, lang: l || p.lang || '', regionSynced: true });
+        return { country: c, language: l };
+      }).catch(function () { return null; });
+    },
+    /** Owner only (the Firestore rules decide): all users/{uid} documents, or rejects with status 403. */
+    listUsers: function () {
+      var out = [];
+      function page(token, n) {
+        return fsFetch('users?pageSize=300' + (token ? '&pageToken=' + encodeURIComponent(token) : ''), { method: 'GET' }).then(function (r) {
+          if (!r.ok) { var e = new Error('HTTP ' + r.status); e.status = r.status; throw e; }
+          return r.json();
+        }).then(function (d) {
+          (d.documents || []).forEach(function (doc) {
+            var f = doc.fields || {}, v = function (k) { return f[k] ? (f[k].stringValue || f[k].timestampValue || '') : ''; };
+            out.push({ country: v('country'), language: v('language'), createdAt: v('createdAt'), updatedAt: v('updatedAt') });
+          });
+          return d.nextPageToken && n < 20 ? page(d.nextPageToken, n + 1) : out;
+        });
+      }
+      return page('', 0);
+    },
     /** Record agreement to the Privacy Policy and Terms ({ v, at, age18 }). */
     setConsent: function (c) { return save({ consent: c }); },
     /** True when deleting needs the password (email + password accounts on Firebase). */
@@ -177,12 +216,51 @@
     /** Delete the account on the server (Firebase), then remove the profile from this device. */
     deleteAccount: function (pw) {
       var pv = providers[active];
-      return Promise.resolve(pv.deleteAccount ? pv.deleteAccount(pw) : null).then(function () { MEIKO.storage.remove(KEY); MEIKO.storage.remove('fleetKey'); return pv.signOut ? pv.signOut() : null; });
+      // The users/{uid} document goes first: once the account is deleted it can no longer be removed by its owner.
+      return deleteRegionDoc().then(function () { return pv.deleteAccount ? pv.deleteAccount(pw) : null; }).catch(function (e) { save({ regionSynced: false }); throw e; }).then(function () { MEIKO.storage.remove(KEY); MEIKO.storage.remove('fleetKey'); return pv.signOut ? pv.signOut() : null; });
     },
     /** Plug in another provider (e.g. Firebase) later: { id, label, verifies, register(email) → Promise<{email, verified, uid}> }. */
     use: function (p) { providers[p.id] = p; active = p.id; },
     provider: function () { return providers[active]; },
     usesFirebase: function () { return active === 'firebase'; }
   };
+  /** fetch() to the Firestore REST API as the signed-in account (path below /documents/). */
+  function fsFetch(path, opts) {
+    var cfg = MEIKO.FIREBASE_CONFIG, pv = providers[active];
+    if (!pv.idToken || !cfg || !cfg.projectId) return Promise.reject(new Error('no-firebase'));
+    return Promise.all([pv.idToken(), pv.appCheckToken ? pv.appCheckToken() : '']).then(function (t) {
+      if (!t[0]) throw new Error('signed-out');
+      var h = { Authorization: 'Bearer ' + t[0] }; if (t[1]) h['X-Firebase-AppCheck'] = t[1];
+      if (opts.body) h['Content-Type'] = 'application/json';
+      return fetch('https://firestore.googleapis.com/v1/projects/' + encodeURIComponent(cfg.projectId) + '/databases/(default)/documents/' + path,
+        { method: opts.method, headers: h, body: opts.body, cache: 'no-store', credentials: 'omit' });
+    });
+  }
+  var syncing = null;
+  function syncRegion() {
+    var p = profile();
+    if (!p || !p.uid || !p.country || p.regionSynced || active !== 'firebase') return Promise.resolve(false);
+    if (navigator.onLine === false) return Promise.resolve(false);
+    if (syncing) return syncing;
+    var iso = function (ms) { return new Date(ms || Date.now()).toISOString(); };
+    var body = { fields: {
+      country: { stringValue: String(p.country).slice(0, 2) }, language: { stringValue: String(p.lang || 'en').slice(0, 5) },
+      createdAt: { timestampValue: iso(p.createdAt) }, updatedAt: { timestampValue: iso() }
+    } };
+    var mask = ['country', 'language', 'createdAt', 'updatedAt'].map(function (f) { return 'updateMask.fieldPaths=' + f; }).join('&');
+    syncing = fsFetch('users/' + encodeURIComponent(p.uid) + '?' + mask, { method: 'PATCH', body: JSON.stringify(body) }).then(function (r) {
+      syncing = null;
+      if (!r.ok) return false;
+      var now = profile(); if (now && now.uid === p.uid && now.country === p.country && now.lang === p.lang) save({ regionSynced: true });
+      return true;
+    }, function () { syncing = null; return false; });
+    return syncing;
+  }
+  function deleteRegionDoc() {
+    var p = profile(); if (!p || !p.uid || active !== 'firebase') return Promise.resolve();
+    return fsFetch('users/' + encodeURIComponent(p.uid), { method: 'DELETE' }).then(function () {}, function () {});
+  }
   initFirebase();
+  window.addEventListener('online', function () { syncRegion(); });
+  setTimeout(function () { syncRegion(); }, 4000);
 })();

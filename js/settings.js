@@ -12,10 +12,13 @@
     coordFormat: 'DDM',       // DD | DDM | DMS
     tz: deviceTz,             // preferred UTC offset in hours
     gpsSource: 'auto',        // auto | device | external
-    lang: 'en'
+    lang: 'en',               // see js/i18n.js (langSet: chosen by the person)
+    langSet: false
   };
   var listeners = [];
   var state = Object.assign({}, DEFAULTS, MEIKO.storage.get('settings', {}));
+  // Until the person picks a language (onboarding or Settings), follow the browser's language.
+  if (!state.langSet) state.lang = MEIKO.i18n.detect();
 
   function applyTheme() {
     var root = document.documentElement;
@@ -32,10 +35,10 @@
     set: function (k, v) {
       state[k] = v; MEIKO.storage.set('settings', state);
       if (k === 'theme') applyTheme();
-      if (k === 'lang') MEIKO.i18n.setLang(v);
+      if (k === 'lang') { state.langSet = true; MEIKO.storage.set('settings', state); MEIKO.i18n.setLang(v); MEIKO.i18n.onReady(function () { if (MEIKO.app && MEIKO.app.rerender && !document.querySelector('.onb')) MEIKO.app.rerender(); }); }
       listeners.forEach(function (fn) { fn(k, v); });
     },
-    reset: function () { state = Object.assign({}, DEFAULTS); MEIKO.storage.set('settings', state); applyTheme(); },
+    reset: function () { state = Object.assign({}, DEFAULTS, { lang: MEIKO.i18n.detect() }); MEIKO.storage.set('settings', state); applyTheme(); MEIKO.i18n.setLang(state.lang); },
     onChange: function (fn) { listeners.push(fn); },
     applyTheme: applyTheme
   };

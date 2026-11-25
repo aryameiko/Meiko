@@ -1,5 +1,5 @@
 /*
- * MEIKO — first-run onboarding: Welcome → Account → Nickname → Vessel avatar → Done.
+ * MEIKO — first-run onboarding: Welcome (language) → Account → Nickname → Country & language → Vessel avatar → Done.
  * With Firebase configured (js/firebase-config.js) the account step offers a Google account or email +
  * password (no email confirmation), and onboarding is REQUIRED before the app can be used. Without a config
  * it is a device-only preview (?welcome or #/welcome).
@@ -12,14 +12,16 @@
   var FB = MEIKO.auth.usesFirebase();
   var GOOGLE_G = '<svg class="g-logo" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>';
   var REQUIRED = FB;
-  var el = null, step = 0, draft = {}, mode = 'new', reconsent = false;
-  var STEPS = ['welcome', 'account', 'nick', 'avatar', 'done'];
+  var el = null, step = 0, draft = {}, mode = 'new', reconsent = false, regionOnly = false;
+  var STEPS = ['welcome', 'account', 'nick', 'region', 'avatar', 'done'];
   var FIRST = 1, LAST = STEPS.length - 2; // steps with dots / back button
 
   function wants() {
     var preview = /[?&]welcome\b/.test(location.search) || location.hash === '#/welcome';
-    return preview || (REQUIRED && !MEIKO.auth.isComplete()) || needsConsent();
+    return preview || (REQUIRED && !MEIKO.auth.isComplete()) || needsConsent() || needsRegion();
   }
+  /** Accounts made before v1.14 have no country yet: they are asked once. */
+  function needsRegion() { var p = MEIKO.auth.profile(); return REQUIRED && MEIKO.auth.isComplete() && !(p && p.country); }
   /** Signed-in users who have not yet agreed to the current Privacy Policy / Terms are asked once. */
   function needsConsent() { return REQUIRED && MEIKO.auth.isComplete() && !MEIKO.legal.consent(); }
   function consentCheck() { return '<div class="onb-consent">' + MEIKO.legal.checkboxHTML(draft.agreed) + '</div>'; }
@@ -32,6 +34,7 @@
     var p = MEIKO.auth.profile();
     if (!p || !p.email) return 0;
     if (!p.nickname) return STEPS.indexOf('nick');
+    if (!p.country) return STEPS.indexOf('region');
     if (!MEIKO.vessel.get()) return STEPS.indexOf('avatar');
     return 0;
   }
@@ -39,19 +42,21 @@
     if (el) return;
     var p = MEIKO.auth.profile() || {}, v = MEIKO.vessel.get();
     var t0 = v ? v.type : 'fishing', def = MEIKO.vessel.types.filter(function (x) { return x.id === t0; })[0].def;
-    draft = { email: p.email || '', nick: p.nickname || '', vname: v ? v.name : '', type: t0, h: v ? v.h : def.h, s: v ? v.s : def.s, a: v ? v.a : def.a };
+    draft = { email: p.email || '', nick: p.nickname || '', vname: v ? v.name : '', type: t0, h: v ? v.h : def.h, s: v ? v.s : def.s, a: v ? v.a : def.a, country: p.country || MEIKO.region.guess() };
     step = resumeStep();
     reconsent = needsConsent();
+    regionOnly = needsRegion();
+    if (regionOnly) step = STEPS.indexOf('region');
     el = document.createElement('div'); el.className = 'onb'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true'); el.setAttribute('aria-label', 'Welcome to MEIKO');
     document.body.appendChild(el); document.body.classList.add('onb-open');
     MEIKO.legal.wireLinks(el); // once: el stays while the steps repaint
     paint();
-    if (FB) MEIKO.auth.googleRedirect().then(function (p) { if (p && el) signedIn(p); });
+    if (FB) MEIKO.auth.googleRedirect().then(function (p) { if (p && el) afterSignIn(p); });
   }
   function close() {
     if (!el) return;
     if (REQUIRED && !MEIKO.auth.isComplete()) return;
-    if (needsConsent()) return;
+    if (needsConsent() || needsRegion()) return;
     el.remove(); el = null; document.body.classList.remove('onb-open');
     if (location.hash === '#/welcome') location.hash = '#/';
     if (/[?&]welcome\b/.test(location.search)) history.replaceState(null, '', location.pathname + location.hash);
@@ -59,7 +64,7 @@
   }
   function dots() { var n = LAST - FIRST + 1, out = ''; for (var i = 0; i < n; i++) out += '<span class="' + (FIRST + i <= step ? 'on' : '') + '"></span>'; return '<div class="onb-dots">' + out + '</div>'; }
   function head(title, sub) {
-    var mid = step >= FIRST && step <= LAST;
+    var mid = step >= FIRST && step <= LAST && !regionOnly;
     return '<div class="onb-top">' + (mid ? '<button type="button" class="onb-back" data-back aria-label="Back">' + icon('i-back') + '</button>' : '<span></span>') + (mid ? dots() : '') + '<span></span></div>' +
       '<h1>' + title + '</h1>' + (sub ? '<p class="onb-sub">' + sub + '</p>' : '');
   }
@@ -71,11 +76,12 @@
     if (reconsent) {
       s = 'consent';
       h = '<div class="onb-hero"><img class="onb-full" src="assets/icons/logo-full.jpg" alt="MEIKO"></div>' +
-        '<h1>Privasi &amp; Syarat</h1><p class="onb-sub">Kebijakan Privasi dan Syarat Penggunaan MEIKO diperbarui. Baru: semua pengguna yang online saling terlihat di <b>Armada Publik</b> Fleet &amp; Chat (nama panggilan, kapal, dan posisi; posisi bisa disembunyikan), ada <b>General Group</b> tanpa kode, dan chat pribadi terenkripsi. Isinya juga menjelaskan data lain yang dipakai (akun di Firebase, sisanya di perangkat Anda) dan batasan penting untuk navigasi. Mohon dibaca dan disetujui untuk melanjutkan.</p>' +
+        '<h1>Privacy &amp; Terms</h1><p class="onb-sub">The MEIKO Privacy Policy has been updated. New: you choose your country and the app language, and they are stored with your account so the developer can see in which countries MEIKO is used. They are not shown to other users. The policy also explains the other data MEIKO uses and the important limits for navigation. Please read and agree to continue.</p>' +
         consentCheck() + '<small class="hint" data-err></small>' +
-        '<button class="btn btn-primary onb-next" data-agree>Setuju &amp; lanjutkan</button>';
+        '<button class="btn btn-primary onb-next" data-agree>Agree &amp; continue</button>';
     } else if (s === 'welcome') {
-      h = '<div class="onb-hero"><img class="onb-full" src="assets/icons/logo-full.jpg" alt="MEIKO"><div class="onb-tag">Navigate · Calculate · Explore</div></div>' +
+      h = '<label class="onb-lang"><span>' + icon('i-globe') + '<span class="sr-only">Language</span></span><select data-lang aria-label="Language">' + MEIKO.region.langOptions(MEIKO.i18n.lang()) + '</select></label>' +
+        '<div class="onb-hero"><img class="onb-full" src="assets/icons/logo-full.jpg" alt="MEIKO"><div class="onb-tag">Navigate · Calculate · Explore</div></div>' +
         '<h1>Welcome aboard</h1><p class="onb-sub">Register with your email, then choose a nickname and your vessel. Other vessels in Fleet &amp; Chat see your nickname and vessel, never your email.</p>' +
         '<button class="btn btn-primary onb-next" data-next>Get started</button>' +
         (FB ? '<button class="btn btn-ghost onb-alt" data-signin>I already have an account</button>' : '');
@@ -104,6 +110,11 @@
       h = head('Your nickname', 'This is how other vessels see you on the map and in chat.') +
         '<label class="field"><span>Nickname</span><input data-nick maxlength="24" autocomplete="nickname" placeholder="e.g. Kapten Arya" value="' + esc(draft.nick) + '"><small class="hint" data-err></small></label>' +
         '<button class="btn btn-primary onb-next" data-next>Continue</button>';
+    } else if (s === 'region') {
+      h = head('Country &amp; language', regionOnly ? 'One more thing: choose your country and the app language. This helps the developer see where MEIKO is used. Other users do not see it.' : 'Where are you from? This helps the developer see in which countries MEIKO is used. Other users do not see it.') +
+        '<label class="field"><span>Country</span><select data-country>' + MEIKO.region.options(draft.country) + '</select><small class="hint" data-err></small></label>' +
+        '<label class="field"><span>App language</span><select data-lang>' + MEIKO.region.langOptions(MEIKO.i18n.lang()) + '</select></label>' +
+        '<button class="btn btn-primary onb-next" data-next>' + (regionOnly ? 'Save &amp; continue' : 'Continue') + '</button>';
     } else if (s === 'avatar') {
       h = head('Your vessel', 'Pick a vessel and colour. This is your avatar on the map.') + art() +
         '<div class="onb-types">' + MEIKO.vessel.types.map(function (t) { return '<button type="button" class="onb-type' + (t.id === draft.type ? ' on' : '') + '" data-type="' + t.id + '" aria-pressed="' + (t.id === draft.type) + '">' + MEIKO.vessel.side(t.id, t.id === draft.type ? draft : t.def, { noWater: true }) + '<small>' + esc(t.label) + '</small></button>'; }).join('') + '</div>' +
@@ -112,7 +123,8 @@
         '<button class="btn btn-primary onb-next" data-next>Finish</button>';
     } else {
       h = '<div class="onb-done">' + art() + '<h1>All set, ' + esc(draft.nick) + '!</h1><p class="onb-sub">' + esc(draft.vname || draft.nick) + ' is ready. You can change your vessel any time under Settings → My Vessel, and your account under Settings → Account.</p>' +
-        '<div class="kv onb-kv"><div class="k">Email</div><div class="v">' + esc(draft.email) + (FB && MEIKO.auth.profile() && MEIKO.auth.profile().via === 'google' ? ' <small>· Google</small>' : '') + '</div><div class="k">Nickname</div><div class="v">' + esc(draft.nick) + '</div></div></div>' +
+        '<div class="kv onb-kv"><div class="k">Email</div><div class="v">' + esc(draft.email) + (FB && MEIKO.auth.profile() && MEIKO.auth.profile().via === 'google' ? ' <small>· Google</small>' : '') + '</div><div class="k">Nickname</div><div class="v">' + esc(draft.nick) + '</div>' +
+        (draft.country ? '<div class="k">Country</div><div class="v" translate="no">' + MEIKO.region.flag(draft.country) + ' ' + esc(MEIKO.region.name(draft.country)) + '</div>' : '') + '</div></div>' +
         '<button class="btn btn-primary onb-next" data-next>Open MEIKO</button>';
     }
     el.innerHTML = '<div class="onb-card onb-step-' + s + '">' + h + '</div>';
@@ -130,9 +142,15 @@
     MEIKO.storage.remove('consent:pending');
     draft.email = p.email || draft.email;
     if (p.nickname) draft.nick = p.nickname; else if (!draft.nick && p.suggestedNick) draft.nick = p.suggestedNick;
-    if (p.nickname && MEIKO.vessel.get()) { step = STEPS.indexOf('done'); var v = MEIKO.vessel.get(); draft.vname = v.name || ''; draft.type = v.type; draft.h = v.h; draft.s = v.s; draft.a = v.a; }
-    else step = STEPS.indexOf('nick');
+    if (p.country) draft.country = p.country;
+    if (p.nickname && p.country && MEIKO.vessel.get()) { step = STEPS.indexOf('done'); var v = MEIKO.vessel.get(); draft.vname = v.name || ''; draft.type = v.type; draft.h = v.h; draft.s = v.s; draft.a = v.a; }
+    else step = STEPS.indexOf(p.nickname && !p.country ? 'region' : 'nick');
     paint();
+  }
+  /** Signed in on a new device: use the country already saved for the account (if any), then go on. */
+  function afterSignIn(p) {
+    if (p && p.country) return signedIn(p);
+    return MEIKO.auth.loadRegion().then(function () { signedIn(MEIKO.auth.profile() || p); });
   }
   function next() {
     var s = STEPS[step];
@@ -147,16 +165,24 @@
         if (pw.length < 8) return err('Password: at least 8 characters.');
         if (pw !== el.querySelector('[data-pw2]').value) return err('The two passwords are not the same.');
         busy(true);
-        return MEIKO.auth.signUp(em, pw).then(signedIn, function (e) { busy(false); err(e.message); });
+        return MEIKO.auth.signUp(em, pw).then(afterSignIn, function (e) { busy(false); err(e.message); });
       }
       if (!pw) return err('Enter your password.');
       busy(true);
-      return MEIKO.auth.signIn(em, pw).then(signedIn, function (e) { busy(false); err(e.message); });
+      return MEIKO.auth.signIn(em, pw).then(afterSignIn, function (e) { busy(false); err(e.message); });
     }
     if (s === 'nick') {
       var n = el.querySelector('[data-nick]').value.trim().replace(/\s+/g, ' ');
       if (n.length < 2) return err('At least 2 characters.');
       draft.nick = n; MEIKO.auth.setNickname(n);
+    }
+    if (s === 'region') {
+      var c = el.querySelector('[data-country]').value;
+      if (!MEIKO.region.valid(c)) { var ce = el.querySelector('[data-country]'); err('Choose your country (or “Prefer not to say”).'); ce.focus(); return; }
+      draft.country = c;
+      MEIKO.settings.set('lang', MEIKO.i18n.lang());
+      MEIKO.auth.setRegion(c, MEIKO.i18n.lang());
+      if (regionOnly) { regionOnly = false; return close(); }
     }
     if (s === 'avatar') {
       draft.vname = el.querySelector('[data-vname]').value.trim();
@@ -176,7 +202,8 @@
     var b = el.querySelector('[data-next]'); if (b) b.addEventListener('click', next);
     el.querySelectorAll('input').forEach(function (i) { i.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); next(); } }); i.addEventListener('input', function () { i.classList.remove('invalid'); var e = el.querySelector('[data-err]'); if (e) e.textContent = ''; }); });
     var bk = el.querySelector('[data-back]'); if (bk) bk.addEventListener('click', back);
-    var ag = el.querySelector('[data-agree]'); if (ag) ag.addEventListener('click', function () { if (!agreed()) return; MEIKO.legal.recordConsent(); reconsent = false; close(); });
+    var ag = el.querySelector('[data-agree]'); if (ag) ag.addEventListener('click', function () { if (!agreed()) return; MEIKO.legal.recordConsent(); reconsent = false; if (needsRegion()) { step = STEPS.indexOf('region'); paint(); } else close(); });
+    var lg = el.querySelector('[data-lang]'); if (lg) lg.addEventListener('change', function () { keep(); MEIKO.settings.set('lang', lg.value); paint(); });
     var cb = el.querySelector('[data-consent]'); if (cb) cb.addEventListener('change', function () { draft.agreed = cb.checked; var e = el.querySelector('[data-err]'); if (e && cb.checked) e.textContent = ''; });
     var si = el.querySelector('[data-signin]'); if (si) si.addEventListener('click', function () { mode = 'old'; step = STEPS.indexOf('account'); paint(); });
     el.querySelectorAll('[data-mode]').forEach(function (x) { x.addEventListener('click', function () { keep(); mode = x.dataset.mode; paint(); }); });
@@ -188,7 +215,7 @@
     var gg = el.querySelector('[data-google]'); if (gg) gg.addEventListener('click', function () {
       if (!agreed()) return;
       MEIKO.storage.set('consent:pending', true); // survives the redirect fallback
-      busy(true); MEIKO.auth.signInGoogle().then(signedIn, function (e) { busy(false); MEIKO.storage.remove('consent:pending'); if (!e.cancelled) err(e.message); });
+      busy(true); MEIKO.auth.signInGoogle().then(afterSignIn, function (e) { busy(false); MEIKO.storage.remove('consent:pending'); if (!e.cancelled) err(e.message); });
     });
     var ot = el.querySelector('[data-other]'); if (ot) ot.addEventListener('click', function () { MEIKO.auth.signOut(); draft.email = ''; mode = 'new'; step = STEPS.indexOf('account'); paint(); });
     el.querySelectorAll('[data-type]').forEach(function (x) { x.addEventListener('click', function () { keep(); var t = MEIKO.vessel.types.filter(function (y) { return y.id === x.dataset.type; })[0]; draft.type = t.id; draft.h = t.def.h; draft.s = t.def.s; draft.a = t.def.a; paint(); }); });
@@ -199,6 +226,7 @@
     var n = el.querySelector('[data-nick]'); if (n) draft.nick = n.value.trim();
     var c = el.querySelector('[data-consent]'); if (c) draft.agreed = c.checked;
     var v = el.querySelector('[data-vname]'); if (v) draft.vname = v.value.trim();
+    var co = el.querySelector('[data-country]'); if (co) draft.country = co.value;
   }
   /* Going on/offline only updates the note: repainting would wipe a typed password and re-enable buttons mid sign-in. */
   function netNote() {

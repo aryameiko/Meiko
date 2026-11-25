@@ -146,6 +146,12 @@ Paste the Firebase web config into `js/firebase-config.js` (`MEIKO.FIREBASE_CONF
 - **Limits.** Both sides need internet; public relays can be slow or down; phones pause web apps in the background. It is not a safety or distress system: use VHF/DSC and AIS. A commercial version with guaranteed delivery and history would need a proper backend (for example Firebase or Supabase under the owner's account).
 - **Code.** Protocol and crypto in `js/core/fleet.js` (tests in `tests/fleet-tests.js` with an in-memory relay), UI in `js/modules/fleet.js`, signing library bundled in `js/vendor/nostr-crypto.js` (@noble/curves + @noble/hashes, MIT).
 
+## Languages, country & language at sign-up (v1.14.0)
+- UI in Bahasa Indonesia, English, Bahasa Melayu, Filipino, Tiếng Việt, ไทย and 简体中文. The language is picked on the welcome screen or in Settings → Appearance (default: the phone's language).
+- The code stays in English; `js/i18n.js` translates the page text as it is drawn. Translations live in `i18n/en.txt` (English, one string per line) and `i18n/translations.txt` (`n|id|ms|tl|vi|th|zh`, empty = keep English). Run `node tools/i18n-build.js` to regenerate `js/lang/*.js`, then bump `CACHE_VERSION`.
+- Privacy Policy and Terms stay in Indonesian (the official version); other languages show a note.
+- Sign-up asks for country (or "Prefer not to say") and language. They are saved on the device and in Firestore `users/{uid}` (country, language, createdAt, updatedAt only). Existing accounts are asked once. Each user writes only their own document; the owner sees "Users by country" in Settings → Account once the Firestore rules allow it.
+
 ## Public fleet (v1.13.0)
 
 - **Online vessels see each other without a code.** After sign-in MEIKO joins the *public fleet* automatically (`PUBLIC_CODE` in `js/core/fleet.js`, same relays and protocol). Other online vessels show in Fleet & Chat **and on the main Map**; tap one for its data and **Chat** (private, end-to-end encrypted as before).
