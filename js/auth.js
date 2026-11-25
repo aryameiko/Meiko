@@ -46,11 +46,11 @@
     if (!F || !cfg || !cfg.apiKey) return false;
     try {
       var app = F.initializeApp(cfg);
-      /* Firebase App Check with reCAPTCHA v3: proves requests come from the real MEIKO page used by a person,
+      /* Firebase App Check with reCAPTCHA Enterprise (Google Cloud Fraud Defense; reCAPTCHA v3 "classic" is deprecated): proves requests come from the real MEIKO page used by a person,
        * not a bot calling Firebase directly. Enforced per service in the Firebase console (Authentication,
        * Cloud Firestore). Must start before Auth so Auth attaches its token. Off while appCheckSiteKey is empty. */
       if (cfg.appCheckSiteKey && F.initializeAppCheck) {
-        try { appCheck = F.initializeAppCheck(app, { provider: new F.ReCaptchaV3Provider(cfg.appCheckSiteKey), isTokenAutoRefreshEnabled: true }); document.documentElement.classList.add('has-recaptcha'); }
+        try { var Prov = cfg.appCheckProvider === 'v3' ? F.ReCaptchaV3Provider : F.ReCaptchaEnterpriseProvider; appCheck = F.initializeAppCheck(app, { provider: new Prov(cfg.appCheckSiteKey), isTokenAutoRefreshEnabled: true }); document.documentElement.classList.add('has-recaptcha'); }
         catch (e) { console.warn('App Check init failed', e); }
       }
       fbAuth = F.initializeAuth(app, { persistence: [F.indexedDBLocalPersistence, F.browserLocalPersistence], popupRedirectResolver: F.browserPopupRedirectResolver });
