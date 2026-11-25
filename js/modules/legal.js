@@ -78,7 +78,7 @@
     ['World Magnetic Model 2025', 'NOAA NCEI & British Geological Survey · public domain', 'https://www.ncei.noaa.gov/products/world-magnetic-model'],
     ['World outline (countries-50m)', 'world-atlas, ISC · © Michael Bostock; data Natural Earth (public domain). Borders are shown as in the source and are not an official position on any boundary.', 'https://github.com/topojson/world-atlas'],
     ['Star catalogue & constellations', 'd3-celestial, BSD-3-Clause · © Olaf Frohn. Star positions from the HYG database (© David Nash / astronexus, CC BY-SA 4.0) / ESA Hipparcos. MEIKO\'s derived star table (js/data/stars-data.js) is shared under the same CC BY-SA terms.', 'https://github.com/ofrohn/d3-celestial'],
-    ['Port positions', 'SMDG Terminal Code List; Kemenhub/Dephub port points via bennyistanto/geodata; NGA World Port Index (US Government, public domain). Unverified; see each port\'s source.', 'https://smdg.org'],
+    ['Port positions', 'Mostly NGA World Port Index (Pub. 150, US Government, public domain). The rest: Kemenhub/Dephub port points and the SMDG Terminal Code List (coordinates only), or MEIKO estimates. Unverified; see each port\'s source.', 'https://msi.nga.mil/Publications/WPI'],
     ['Port sea distances', 'Computed by MEIKO (tools/sea-distances.js): shortest water path on the Natural Earth 1:10m coastline (public domain). No third-party distance tables.', null],
     ['Solar & prayer algorithms', 'NOAA Solar Calculator / J. Meeus, Astronomical Algorithms (methods, own code).', null]
   ];

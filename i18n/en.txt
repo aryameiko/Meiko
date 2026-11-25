@@ -1534,3 +1534,4 @@ Port sea distances
 d3-celestial, BSD-3-Clause · © Olaf Frohn. Star positions from the HYG database (© David Nash / astronexus, CC BY-SA 4.0) / ESA Hipparcos. MEIKO's derived star table (js/data/stars-data.js) is shared under the same CC BY-SA terms.
 © OpenSeaMap contributors: data ODbL, map tiles CC BY-SA 2.0. Community data, not official.
 River port: measured from the nearest coast, so the figure is rough.
+Mostly NGA World Port Index (Pub. 150, US Government, public domain). The rest: Kemenhub/Dephub port points and the SMDG Terminal Code List (coordinates only), or MEIKO estimates. Unverified; see each port's source.
