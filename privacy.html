@@ -10,9 +10,9 @@
   <link rel="stylesheet" href="css/legal.css">
 </head>
 <body>
-<main id="legal" class="legal" data-legal-version="2026-11-24.2">
+<main id="legal" class="legal" data-legal-version="2026-11-25.1">
 <h1>Kebijakan Privasi MEIKO</h1>
-<p class="legal-meta">Berlaku sejak 24 November 2026 · Versi 2026-11-24.2 (Armada Publik)</p>
+<p class="legal-meta">Berlaku sejak 25 November 2026 · Versi 2026-11-25.1 (perlindungan dari bot)</p>
 
 <p>Kebijakan ini menjelaskan data pribadi apa yang diproses aplikasi MEIKO (situs <b>aryameiko.github.io/Meiko</b> dan aplikasi yang dipasang darinya), untuk apa, ke mana data itu dikirim, berapa lama disimpan, dan apa hak Anda. Kebijakan ini disusun dengan mengacu pada Undang-Undang Nomor 27 Tahun 2022 tentang Pelindungan Data Pribadi (UU PDP).</p>
 
@@ -46,6 +46,8 @@
 
 <h2>4. Pihak ketiga yang menerima data</h2>
 <ul>
+  <li><b>Google LLC – reCAPTCHA dan Firebase App Check</b> (pemroses data): memeriksa bahwa yang mendaftar, masuk, dan mengambil kunci Armada Publik adalah aplikasi MEIKO asli yang dipakai manusia, bukan bot. Untuk itu Google menerima data teknis perangkat dan peramban (misalnya alamat IP, jenis peramban, dan interaksi di halaman). <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Kebijakan Privasi</a> dan <a href="https://policies.google.com/terms" target="_blank" rel="noopener">Persyaratan Layanan</a> Google berlaku.</li>
+  <li><b>Google LLC – Cloud Firestore</b> (pemroses data): menyimpan kunci Armada Publik yang hanya bisa dibaca akun MEIKO yang sudah masuk. Tidak ada data pribadi Anda yang disimpan di sana.</li>
   <li><b>Google LLC – Firebase Authentication</b> (pemroses data): menyimpan akun. Server Google dapat berada di luar Indonesia, termasuk Amerika Serikat. <a href="https://firebase.google.com/support/privacy" target="_blank" rel="noopener">Privasi Firebase</a> · <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Kebijakan Privasi Google</a>.</li>
   <li><b>Relay Nostr publik</b> (bawaan: relay.damus.io, nos.lol, relay.primal.net, offchain.pub; Anda dapat menggantinya): meneruskan pesan dan posisi Fleet &amp; Chat. Relay ini dijalankan pihak independen di berbagai negara dan <b>bukan milik MEIKO</b>. Di grup privat, isi pesan, posisi, nama panggilan, dan lampiran dienkripsi dengan kode grup sebelum dikirim, sehingga relay tidak dapat membacanya. Kunci <b>Armada Publik</b> hanya diberikan kepada akun MEIKO yang sudah masuk (disimpan di Firebase Firestore, tidak ada di kode aplikasi), jadi orang tanpa akun MEIKO tidak dapat membaca posisi di sana. Namun semua pengguna MEIKO dapat melihat nama panggilan, kapal, dan posisi yang Anda bagikan di Armada Publik, jadi data itu <b>tidak rahasia</b>. Chat pribadi tetap dienkripsi ujung ke ujung. Relay tetap dapat melihat alamat IP, kunci publik perangkat, waktu, dan ukuran data. Pesan diberi masa berlaku 3 hari, tetapi kami tidak dapat menjamin setiap relay menghapusnya tepat waktu.</li>
   <li><b>Penyedia peta</b>: OpenStreetMap Foundation (peta jalan), Esri (citra satelit dan nama tempat), dan OpenSeaMap (rambu laut). Saat peta dimuat, server mereka menerima alamat IP Anda dan petak peta yang diminta (yang menunjukkan area yang sedang Anda lihat).</li>

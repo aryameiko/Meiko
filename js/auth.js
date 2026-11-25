@@ -23,7 +23,7 @@
   var active = 'local';
 
   /* ---- Firebase Auth: email + password (no email confirmation) or a Google account ---- */
-  var fbAuth = null;
+  var fbAuth = null, appCheck = null;
   function fbErr(e) {
     var c = (e && e.code) || '';
     var map = {
@@ -31,6 +31,7 @@
       'auth/invalid-email': 'Enter a valid email address, e.g. name@example.com',
       'auth/weak-password': 'Password too weak: use at least 8 characters.',
       'auth/invalid-credential': 'Wrong email or password.', 'auth/wrong-password': 'Wrong email or password.', 'auth/user-not-found': 'No account with this email. Choose "Create account".',
+      'auth/firebase-app-check-token-is-invalid': 'MEIKO could not confirm this is a real person using the app (bot check). Reload the page and try again; turn off ad or tracker blockers for this site if it keeps happening.',
       'auth/too-many-requests': 'Too many attempts. Wait a few minutes and try again.',
       'auth/network-request-failed': 'No internet connection. The first sign-in needs internet; after that MEIKO works offline.',
       'auth/unauthorized-domain': 'This web address is not allowed in Firebase (add it under Authentication → Settings → Authorized domains).',
@@ -45,6 +46,13 @@
     if (!F || !cfg || !cfg.apiKey) return false;
     try {
       var app = F.initializeApp(cfg);
+      /* Firebase App Check with reCAPTCHA v3: proves requests come from the real MEIKO page used by a person,
+       * not a bot calling Firebase directly. Enforced per service in the Firebase console (Authentication,
+       * Cloud Firestore). Must start before Auth so Auth attaches its token. Off while appCheckSiteKey is empty. */
+      if (cfg.appCheckSiteKey && F.initializeAppCheck) {
+        try { appCheck = F.initializeAppCheck(app, { provider: new F.ReCaptchaV3Provider(cfg.appCheckSiteKey), isTokenAutoRefreshEnabled: true }); document.documentElement.classList.add('has-recaptcha'); }
+        catch (e) { console.warn('App Check init failed', e); }
+      }
       fbAuth = F.initializeAuth(app, { persistence: [F.indexedDBLocalPersistence, F.browserLocalPersistence], popupRedirectResolver: F.browserPopupRedirectResolver });
       try { fbAuth.languageCode = 'id'; } catch (e) {}
       F.onAuthStateChanged(fbAuth, function (u) {
@@ -72,6 +80,8 @@
       },
       redirected: function () { return redirected; },
       /** ID token of the signed-in Firebase user (proves to Firestore that this is a MEIKO account), or null. */
+      /** App Check token for direct REST calls (Firestore), or '' when App Check is off or unavailable. */
+      appCheckToken: function () { return appCheck && F.getAppCheckToken ? F.getAppCheckToken(appCheck, false).then(function (r) { return r && r.token || ''; }, function () { return ''; }) : Promise.resolve(''); },
       idToken: function () {
         return Promise.resolve(fbAuth.authStateReady ? fbAuth.authStateReady() : null).then(function () { var u = fbAuth.currentUser; return u ? u.getIdToken() : null; });
       },
@@ -142,9 +152,10 @@
       var mine = c && p && c.uid === p.uid && typeof c.k === 'string' ? c.k : null;
       if (mine && !force && Date.now() - (c.at || 0) < 6 * 3600 * 1000) return Promise.resolve(mine);
       if (!pv.idToken || !cfg || !cfg.projectId) return mine ? Promise.resolve(mine) : Promise.reject(new Error('The public fleet needs a MEIKO account.'));
-      return pv.idToken().then(function (tok) {
-        if (!tok) throw new Error('Sign in again (internet needed) to join the public fleet.');
-        return fetch('https://firestore.googleapis.com/v1/projects/' + encodeURIComponent(cfg.projectId) + '/databases/(default)/documents/config/fleet', { headers: { Authorization: 'Bearer ' + tok }, cache: 'no-store', credentials: 'omit' });
+      return Promise.all([pv.idToken(), pv.appCheckToken ? pv.appCheckToken() : '']).then(function (t) {
+        if (!t[0]) throw new Error('Sign in again (internet needed) to join the public fleet.');
+        var h = { Authorization: 'Bearer ' + t[0] }; if (t[1]) h['X-Firebase-AppCheck'] = t[1];
+        return fetch('https://firestore.googleapis.com/v1/projects/' + encodeURIComponent(cfg.projectId) + '/databases/(default)/documents/config/fleet', { headers: h, cache: 'no-store', credentials: 'omit' });
       }).then(function (r) {
         if (r.status === 403 || r.status === 404) throw new Error('The public fleet is not set up yet. Please tell the app owner.');
         if (!r.ok) throw new Error('Could not load the public fleet (HTTP ' + r.status + ').');

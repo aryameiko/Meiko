@@ -11,5 +11,7 @@ MEIKO.FIREBASE_CONFIG = {
   projectId: 'meiko-33002',
   storageBucket: 'meiko-33002.firebasestorage.app',
   messagingSenderId: '130685004974',
-  appId: '1:130685004974:web:a8eec9e5bb5fcb2a43d13f'
+  appId: '1:130685004974:web:a8eec9e5bb5fcb2a43d13f',
+  /* reCAPTCHA v3 site key for Firebase App Check (bot protection). Public by design; empty = App Check off. */
+  appCheckSiteKey: ''
 };

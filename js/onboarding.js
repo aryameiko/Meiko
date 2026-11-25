@@ -92,7 +92,8 @@
           (isNew ? '<label class="field"><span>Repeat password</span><input type="password" data-pw2 autocomplete="new-password" placeholder="Type it again"></label>' : '') +
           '<small class="hint" data-err></small>' + offlineNote() +
           '<button class="btn btn-primary onb-next" data-next>' + (isNew ? 'Create account' : 'Sign in') + '</button>' +
-          (isNew ? '' : '<button type="button" class="btn btn-ghost onb-alt" data-forgot>Forgot password?</button>');
+          (isNew ? '' : '<button type="button" class="btn btn-ghost onb-alt" data-forgot>Forgot password?</button>') +
+          (MEIKO.FIREBASE_CONFIG && MEIKO.FIREBASE_CONFIG.appCheckSiteKey ? '<p class="small muted onb-recaptcha">Protected from bots by reCAPTCHA. The Google <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Privacy Policy</a> and <a href="https://policies.google.com/terms" target="_blank" rel="noopener">Terms of Service</a> apply.</p>' : '');
       } else {
         h = head('Your email', 'Used to register you in MEIKO.') +
           '<label class="field"><span>Email</span><input type="email" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" data-email placeholder="name@example.com" value="' + esc(draft.email) + '"><small class="hint" data-err></small></label>' +

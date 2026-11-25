@@ -783,3 +783,7 @@ body.onb-open .sheet-backdrop { z-index: 5100; }
 .gen-head .btn { margin-top: 6px; }
 .gen-join { padding: 6px 2px; } .gen-join p { margin: 0 0 8px; }
 .fleet-sheet .fs-mod { margin-top: 4px; } .fleet-sheet .fs-mod + small { display: block; margin-top: 6px; }
+
+/* reCAPTCHA v3 badge: hidden because the sign-in screen shows the required notice instead (.onb-recaptcha). */
+.has-recaptcha .grecaptcha-badge { visibility: hidden !important; }
+.onb-recaptcha { margin-top: 12px; text-align: center; }
