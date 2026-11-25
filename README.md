@@ -150,6 +150,7 @@ Paste the Firebase web config into `js/firebase-config.js` (`MEIKO.FIREBASE_CONF
 - UI in Bahasa Indonesia, English, Bahasa Melayu, Filipino, Tiếng Việt, ไทย and 简体中文. The language is picked on the welcome screen or in Settings → Appearance (default: the phone's language).
 - The code stays in English; `js/i18n.js` translates the page text as it is drawn. Translations live in `i18n/en.txt` (English, one string per line) and `i18n/translations.txt` (`n|id|ms|tl|vi|th|zh`, empty = keep English). Run `node tools/i18n-build.js` to regenerate `js/lang/*.js`, then bump `CACHE_VERSION`.
 - Privacy Policy and Terms stay in Indonesian (the official version); other languages show a note.
+- v1.15.0: other vessels see each vessel's flag and language in Fleet & Chat (list, map label, vessel details, chat). They travel with the encrypted presence/chat messages (`cc`, `lang`); "Prefer not to say" sends neither.
 - Sign-up asks for country (or "Prefer not to say") and language. They are saved on the device and in Firestore `users/{uid}` (country, language, createdAt, updatedAt only). Existing accounts are asked once. Each user writes only their own document; the owner sees "Users by country" in Settings → Account once the Firestore rules allow it.
 
 ## Public fleet (v1.13.0)

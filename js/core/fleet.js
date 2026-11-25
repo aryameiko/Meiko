@@ -129,6 +129,9 @@
     if (k === 'dm') return typeof p.c === 'string' && p.c.length < 120000 ? { k: 'dm', c: p.c } : null;
     if (k === 'part') return sanitizePart(p);
     var out = { k: k, name: str(p.name, 40) || 'Unnamed vessel', callsign: str(p.callsign, 16) };
+    // Country (ISO 3166-1 alpha-2) and app language the sender chose, so others know which language to use.
+    out.cc = typeof p.cc === 'string' && /^[A-Z]{2}$/.test(p.cc) && p.cc !== 'ZZ' ? p.cc : '';
+    out.lang = typeof p.lang === 'string' && /^[a-z]{2,3}$/.test(p.lang) ? p.lang : '';
     var v = p.v && typeof p.v === 'object' ? p.v : null;
     out.vessel = v && VESSEL_TYPES.indexOf(v.type) >= 0 ? { type: v.type, h: colour(v.h), s: colour(v.s), a: colour(v.a) } : null;
     if (k === 'chat') { out.text = str(p.text, 500); out.att = sanitizeAtt(p.att); if (!out.text && !out.att) return null; }

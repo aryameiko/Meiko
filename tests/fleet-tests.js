@@ -86,6 +86,13 @@ module.exports = function run(test) {
     assert.strictEqual(fleet.sanitize({ k: 'chat', text: '   ' }), null);
     assert.strictEqual(fleet.sanitize({ k: 'chat', text: 'y'.repeat(900) }).text.length, 500);
   });
+  t('Fleet: country flag and language travel with the vessel; bad values are dropped', function () {
+    var p = fleet.sanitize({ k: 'live', name: 'A', cc: 'ID', lang: 'id' });
+    assert.strictEqual(p.cc, 'ID'); assert.strictEqual(p.lang, 'id');
+    var q = fleet.sanitize({ k: 'chat', name: 'A', text: 'hi', cc: '<b>', lang: 'en"><img' });
+    assert.strictEqual(q.cc, ''); assert.strictEqual(q.lang, '');
+    assert.strictEqual(fleet.sanitize({ k: 'live', cc: 'ZZ', lang: 'xx' }).cc, '');
+  });
   t('Fleet: hidden direction marks cannot disguise a file name or a vessel name', function () {
     var p = fleet.sanitize({ k: 'chat', name: 'Ba\u200Bsar\u202Enas', text: 'x', att: { fid: '0123456789abcdef', name: 'photo\u202Egpj.apk', mime: 'application/vnd.android.package-archive', size: 100, n: 1 } });
     assert.strictEqual(p.name, 'Basarnas'); assert.strictEqual(p.att.name, 'photogpj.apk');

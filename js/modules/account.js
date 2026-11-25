@@ -53,7 +53,7 @@
         '<label class="field"><span>Nickname</span><input data-nick maxlength="24" value="' + esc(p.nickname || '') + '"><small class="hint" data-hint>Shown to other vessels in Fleet &amp; Chat.</small></label>' +
         '<div class="actions"><button class="btn btn-primary" data-save>' + icon('i-check') + 'Save nickname</button><a class="btn btn-ghost" href="#/t/vessel">' + icon('i-anchor') + 'My Vessel</a></div></div>' +
         '<div class="card card-pad form-gap"><b>' + icon('i-globe') + ' Country &amp; language</b>' +
-        '<label class="field"><span>Country</span><select data-country>' + MEIKO.region.options(p.country || '') + '</select><small class="hint" data-chint>Only the app developer can see this, to know where MEIKO is used.</small></label>' +
+        '<label class="field"><span>Country</span><select data-country>' + MEIKO.region.options(p.country || '') + '</select><small class="hint" data-chint>Other vessels see your flag and language in Fleet &amp; Chat.</small></label>' +
         '<label class="field"><span>App language</span><select data-lang>' + MEIKO.region.langOptions(MEIKO.i18n.lang()) + '</select></label>' +
         '<div class="actions"><button class="btn btn-primary" data-csave>' + icon('i-check') + 'Save</button></div></div>' +
         '<div data-owner></div>' +

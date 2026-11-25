@@ -1517,3 +1517,9 @@ This removes your vessel avatar and name from this device.
 Vessel removed
 and
 Could not delete your data on the server. Check the internet connection and try again.
+including showing my flag and language to other MEIKO vessels and storing my account, country and language on Firebase (Google) outside Indonesia.
+Other vessels see your flag and language in Fleet & Chat.
+One more thing: choose your country and your language. Other vessels see your flag and language, so you know which language to use with each other.
+Where are you from? Other vessels see your flag and language, so you know which language to use with each other.
+The MEIKO Privacy Policy has been updated. New: other MEIKO vessels see your flag and language in Fleet & Chat (choose “Prefer not to say” to hide them). They are also stored with your account to count users per country. The policy also explains the other data MEIKO uses and the important limits for navigation. Please read and agree to continue.
+Speaks

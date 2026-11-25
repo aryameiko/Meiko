@@ -7,7 +7,7 @@
 (function () {
   'use strict';
   var ui = MEIKO.ui, esc = ui.esc, icon = ui.icon;
-  var VERSION = '2026-11-25.2';
+  var VERSION = '2026-11-25.3';
   var DOCS = { privacy: { file: 'privacy.html', title: 'Privacy Policy' }, terms: { file: 'terms.html', title: 'Terms of Use' } };
   var cache = {};
 
@@ -46,7 +46,7 @@
   function recordConsent() { return MEIKO.auth.setConsent({ v: VERSION, at: new Date().toISOString(), age18: true }); }
   /** The consent checkbox used in onboarding (both for Google and email sign-up). */
   function checkboxHTML(checked) {
-    return '<label class="legal-check"><input type="checkbox" data-consent' + (checked ? ' checked' : '') + '> <span>I am 18 or older (or have permission from a parent or guardian) and I agree to the MEIKO <a href="privacy.html" data-legal="privacy">Privacy Policy</a> and <a href="terms.html" data-legal="terms">Terms of Use</a>, including storage of my account, country and language on Firebase (Google) outside Indonesia.</span></label>';
+    return '<label class="legal-check"><input type="checkbox" data-consent' + (checked ? ' checked' : '') + '> <span>I am 18 or older (or have permission from a parent or guardian) and I agree to the MEIKO <a href="privacy.html" data-legal="privacy">Privacy Policy</a> and <a href="terms.html" data-legal="terms">Terms of Use</a>, including showing my flag and language to other MEIKO vessels and storing my account, country and language on Firebase (Google) outside Indonesia.</span></label>';
   }
 
   MEIKO.legal = { VERSION: VERSION, load: load, show: show, consent: consent, recordConsent: recordConsent, checkboxHTML: checkboxHTML, wireLinks: wireLinks };

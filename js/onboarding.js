@@ -76,7 +76,7 @@
     if (reconsent) {
       s = 'consent';
       h = '<div class="onb-hero"><img class="onb-full" src="assets/icons/logo-full.jpg" alt="MEIKO"></div>' +
-        '<h1>Privacy &amp; Terms</h1><p class="onb-sub">The MEIKO Privacy Policy has been updated. New: you choose your country and the app language, and they are stored with your account so the developer can see in which countries MEIKO is used. They are not shown to other users. The policy also explains the other data MEIKO uses and the important limits for navigation. Please read and agree to continue.</p>' +
+        '<h1>Privacy &amp; Terms</h1><p class="onb-sub">The MEIKO Privacy Policy has been updated. New: other MEIKO vessels see your flag and language in Fleet &amp; Chat (choose “Prefer not to say” to hide them). They are also stored with your account to count users per country. The policy also explains the other data MEIKO uses and the important limits for navigation. Please read and agree to continue.</p>' +
         consentCheck() + '<small class="hint" data-err></small>' +
         '<button class="btn btn-primary onb-next" data-agree>Agree &amp; continue</button>';
     } else if (s === 'welcome') {
@@ -111,7 +111,7 @@
         '<label class="field"><span>Nickname</span><input data-nick maxlength="24" autocomplete="nickname" placeholder="e.g. Kapten Arya" value="' + esc(draft.nick) + '"><small class="hint" data-err></small></label>' +
         '<button class="btn btn-primary onb-next" data-next>Continue</button>';
     } else if (s === 'region') {
-      h = head('Country &amp; language', regionOnly ? 'One more thing: choose your country and the app language. This helps the developer see where MEIKO is used. Other users do not see it.' : 'Where are you from? This helps the developer see in which countries MEIKO is used. Other users do not see it.') +
+      h = head('Country &amp; language', regionOnly ? 'One more thing: choose your country and your language. Other vessels see your flag and language, so you know which language to use with each other.' : 'Where are you from? Other vessels see your flag and language, so you know which language to use with each other.') +
         '<label class="field"><span>Country</span><select data-country>' + MEIKO.region.options(draft.country) + '</select><small class="hint" data-err></small></label>' +
         '<label class="field"><span>App language</span><select data-lang>' + MEIKO.region.langOptions(MEIKO.i18n.lang()) + '</select></label>' +
         '<button class="btn btn-primary onb-next" data-next>' + (regionOnly ? 'Save &amp; continue' : 'Continue') + '</button>';

@@ -54,8 +54,13 @@
   }
   function me() {
     var v = MEIKO.vessel && MEIKO.vessel.get(), c = cfg();
-    return { name: (c.name || (MEIKO.auth && MEIKO.auth.nickname()) || (v && v.name) || 'Unnamed vessel').slice(0, 40), callsign: v && v.callsign ? v.callsign.slice(0, 16) : '', v: v ? { type: v.type, h: v.h, s: v.s, a: v.a } : null };
+    var pr = MEIKO.auth && MEIKO.auth.profile && MEIKO.auth.profile();
+    var cc = pr && pr.country && pr.country !== 'ZZ' ? pr.country : '', lang = (pr && pr.country === 'ZZ') ? '' : ((pr && pr.lang) || (MEIKO.i18n && MEIKO.i18n.lang()) || '');
+    return { name: (c.name || (MEIKO.auth && MEIKO.auth.nickname()) || (v && v.name) || 'Unnamed vessel').slice(0, 40), callsign: v && v.callsign ? v.callsign.slice(0, 16) : '', cc: cc, lang: lang, v: v ? { type: v.type, h: v.h, s: v.s, a: v.a } : null };
   }
+  /** Flag and spoken language a vessel chose at sign-up (sent with its presence), so others know how to talk to it. */
+  function flagOf(x) { var cc = x && (x.cc || (st.peers[x.from] && st.peers[x.from].cc)); return cc && MEIKO.region ? MEIKO.region.flag(cc) + ' ' : ''; }
+  function langOf(x) { var i = x && x.lang && MEIKO.i18n.info(x.lang); return i ? i.name : ''; }
   function supported() { return !!(window.WebSocket && window.crypto && window.crypto.subtle && window.MeikoNostrCrypto && C.fleet); }
 
   function onFix(f) {
@@ -111,7 +116,7 @@
   }
   function addChat(m) {
     if (st.chat.some(function (x) { return x.id === m.id; })) return false;
-    st.chat.push({ id: m.id, from: m.from, me: m.me, name: m.name, callsign: m.callsign, text: m.text, att: m.att || null, at: m.at });
+    st.chat.push({ id: m.id, from: m.from, me: m.me, name: m.name, callsign: m.callsign, cc: m.cc || '', lang: m.lang || '', text: m.text, att: m.att || null, at: m.at });
     st.chat.sort(function (a, b) { return a.at - b.at; });
     if (st.chat.length > 100) st.chat = st.chat.slice(-100);
     MEIKO.storage.set(chatKey(), st.chat);
@@ -275,7 +280,7 @@
       var fid = Array.prototype.map.call(window.MeikoNostrCrypto.randomBytes(8), function (x) { return ('0' + x.toString(16)).slice(-2); }).join('');
       var m = me();
       return putFile(st.client.pubkey + ':' + fid, { bytes: r.bytes, name: r.name, mime: r.mime, at: Date.now() }).catch(function () {}).then(function () {
-        return st.client.sendFile(to, r.bytes, { fid: fid, name: r.name, mime: r.mime, w: r.w, h: r.h }, caption, { name: m.name, callsign: m.callsign, v: m.v }, onProgress);
+        return st.client.sendFile(to, r.bytes, { fid: fid, name: r.name, mime: r.mime, w: r.w, h: r.h }, caption, { name: m.name, callsign: m.callsign, cc: m.cc, lang: m.lang, v: m.v }, onProgress);
       }).then(function (out) { out.cut = !!r.cut; out.kb = Math.round(r.bytes.length / 1024); return out; });
     });
   }
@@ -293,7 +298,7 @@
         if (p.me || blocked(p.from)) return;
         if (p.k === 'bye') { if (st.peers[p.from]) { st.peers[p.from].left = true; st.peers[p.from].at = p.at; } emit('peers'); return; }
         var old = st.peers[p.from] || {};
-        st.peers[p.from] = { id: p.from, name: p.name, callsign: p.callsign, vessel: p.vessel, ns: p.ns, pos: p.pos || (old.pos && Date.now() - old.pos.seen < 2 * 3600 * 1000 ? old.pos : null), at: Math.max(p.at, old.at || 0), left: false };
+        st.peers[p.from] = { id: p.from, name: p.name, callsign: p.callsign, cc: p.cc || '', lang: p.lang || '', vessel: p.vessel, ns: p.ns, pos: p.pos || (old.pos && Date.now() - old.pos.seen < 2 * 3600 * 1000 ? old.pos : null), at: Math.max(p.at, old.at || 0), left: false };
         if (p.pos) st.peers[p.from].pos.seen = p.at;
         emit('peers');
       },
@@ -342,7 +347,7 @@
   function sendChat(text) {
     text = String(text || '').trim(); if (!text || !st.client || !groupOn()) return Promise.resolve(null);
     var m = me();
-    return st.client.sendChat(text, { name: m.name, callsign: m.callsign, v: m.v });
+    return st.client.sendChat(text, { name: m.name, callsign: m.callsign, cc: m.cc, lang: m.lang, v: m.v });
   }
   function sendDM(peer, text) {
     text = String(text || '').trim(); if (!text || !st.client) return Promise.resolve(null);
@@ -440,7 +445,7 @@
         var v = vesselOf(p), moving = p.pos.sog == null || p.pos.sog > 0.5, hdg = moving ? p.pos.cog : null;
         var icon = v ? L.divIcon({ className: 'mk vsl-mk' + (online(p) ? '' : ' stale'), html: MEIKO.vessel.markerHTML(v, hdg), iconSize: hdg != null ? [34, 68] : [76, 46], iconAnchor: hdg != null ? [17, 34] : [38, 39] })
           : L.divIcon({ className: 'mk pm-dot fleet-dot' + (online(p) ? '' : ' stale'), iconSize: [16, 16], iconAnchor: [8, 8] });
-        var tip = '<b translate="no">' + esc(p.name) + '</b> ' + nsBadge(p) + ' · ' + (online(p) ? 'online' : ago(p.pos.seen || p.at)) + '<br>COG ' + deg(p.pos.cog) + ' · SOG ' + kn(p.pos.sog);
+        var tip = '<b translate="no">' + flagOf(p) + esc(p.name) + '</b> ' + nsBadge(p) + ' · ' + (online(p) ? 'online' : ago(p.pos.seen || p.at)) + '<br>COG ' + deg(p.pos.cog) + ' · SOG ' + kn(p.pos.sog);
         var ll = [p.pos.lat, p.pos.lon]; pts.push(ll);
         if (!markers[p.id]) added = markers[p.id] = L.marker(ll, { icon: icon, keyboard: false, title: p.name }).bindTooltip(tip, { permanent: true, direction: 'top', offset: [0, -10], className: 'pm-label fleet-label', interactive: true })
           .on('click', (function (pid) { return function (e) { L.DomEvent.stop(e); onTap(pid); }; })(p.id)).addTo(fm.map);
@@ -459,6 +464,8 @@
     var nsx = p.ns != null && C.fleet.navStatus(p.ns);
     rows.push(['Nav status', nsx ? '<span class="ns-badge ns-' + nsx.code + '">' + nsx.icon + ' ' + esc(nsx.label) + '</span>' : 'Not set']);
     rows.push(['Online', online(p) ? '<span class="dot ok"></span> online' : p.at ? (p.left ? 'left · ' : 'last seen ') + ago(p.at) : 'not seen yet']);
+    if (p.cc) rows.push(['Country', '<span translate="no">' + flagOf(p) + esc(MEIKO.region.name(p.cc)) + '</span>']);
+    if (langOf(p)) rows.push(['Speaks', '<span translate="no">' + esc(langOf(p)) + '</span>']);
     rows.push(['ID', C.fleet.shortId(id)]);
     if (t) rows.push(['Vessel type', esc(t.label)]);
     if (p.callsign) rows.push(['Call sign', esc(p.callsign)]);
@@ -593,7 +600,7 @@
         var dist = '';
         if (p.pos && st.fix) { var g = C.geo.greatCircle(st.fix.lat, st.fix.lon, p.pos.lat, p.pos.lon); dist = ui.num(g.distanceNM, g.distanceNM < 10 ? 2 : 1) + ' NM · ' + ui.bearing(g.initialBearing) + ' T'; }
         return '<div class="fleet-peer' + (online(p) ? '' : ' off') + '"><button type="button" class="fp-btn" data-peer="' + esc(p.id) + '">' +
-          '<span class="dot ' + (online(p) ? 'ok' : '') + '"></span><span class="fp-main"><b><span translate="no">' + esc(p.name) + '</span> ' + nsBadge(p) + (p.callsign ? ' <small translate="no">' + esc(p.callsign) + '</small>' : '') + '</b>' +
+          '<span class="dot ' + (online(p) ? 'ok' : '') + '"></span><span class="fp-main"><b><span translate="no">' + flagOf(p) + esc(p.name) + '</span> ' + nsBadge(p) + (p.callsign ? ' <small translate="no">' + esc(p.callsign) + '</small>' : '') + (langOf(p) ? ' <small class="fp-lang" translate="no">' + esc(langOf(p)) + '</small>' : '') + '</b>' +
           '<small>' + (p.pos ? 'COG ' + deg(p.pos.cog) + ' · SOG ' + kn(p.pos.sog) + (dist ? ' · ' + dist : '') : 'Position not shared') + '</small></span>' +
           '<small class="fp-seen">' + (p.left ? 'left · ' : '') + (online(p) ? 'online' : ago(p.at)) + '<br><span class="fp-id">ID ' + C.fleet.shortId(p.id) + '</span></small></button>' +
           '<button type="button" class="btn btn-ghost btn-sm fp-dm" data-dm="' + esc(p.id) + '" aria-label="Chat with ' + esc(p.name) + '">' + icon('i-chat') + 'Chat' + (st.unread[p.id] ? ' <span class="badge-n">' + st.unread[p.id] + '</span>' : '') + '</button></div>';
@@ -623,7 +630,7 @@
           '<small class="att-state">' + (pr != null ? 'Receiving… ' + Math.round(pr * 100) + '%' : 'Loading…') + '</small></div>';
       }
       function msgHTML(m, showName) {
-        return '<div class="msg' + (m.me ? ' me' : '') + '"><div class="msg-meta">' + (m.me ? 'You' : (m.from ? '<button type="button" class="msg-who" translate="no" data-who="' + esc(m.from) + '">' + esc(m.name) + '</button>' : esc(m.name)) + (showName && m.from ? ' · ID ' + C.fleet.shortId(m.from) : '')) + ' · ' + esc(ui.time(m.at)) + (Date.now() - m.at > 86400000 ? ' · ' + esc(ui.date(m.at)) : '') + '</div>' + attHTML(m) + (m.text ? '<div class="msg-text" translate="no">' + esc(m.text) + '</div>' : '') + '</div>';
+        return '<div class="msg' + (m.me ? ' me' : '') + '"><div class="msg-meta">' + (m.me ? 'You' : (m.from ? '<button type="button" class="msg-who" translate="no" data-who="' + esc(m.from) + '">' + flagOf(m) + esc(m.name) + '</button>' : esc(m.name)) + (showName && m.from ? ' · ID ' + C.fleet.shortId(m.from) : '')) + ' · ' + esc(ui.time(m.at)) + (Date.now() - m.at > 86400000 ? ' · ' + esc(ui.date(m.at)) : '') + '</div>' + attHTML(m) + (m.text ? '<div class="msg-text" translate="no">' + esc(m.text) + '</div>' : '') + '</div>';
       }
       function hydrate() {
         ui.$$('[data-att]', view).forEach(function (el) {
