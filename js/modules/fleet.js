@@ -440,7 +440,7 @@
         var v = vesselOf(p), moving = p.pos.sog == null || p.pos.sog > 0.5, hdg = moving ? p.pos.cog : null;
         var icon = v ? L.divIcon({ className: 'mk vsl-mk' + (online(p) ? '' : ' stale'), html: MEIKO.vessel.markerHTML(v, hdg), iconSize: hdg != null ? [34, 68] : [76, 46], iconAnchor: hdg != null ? [17, 34] : [38, 39] })
           : L.divIcon({ className: 'mk pm-dot fleet-dot' + (online(p) ? '' : ' stale'), iconSize: [16, 16], iconAnchor: [8, 8] });
-        var tip = '<b>' + esc(p.name) + '</b> ' + nsBadge(p) + ' · ' + (online(p) ? 'online' : ago(p.pos.seen || p.at)) + '<br>COG ' + deg(p.pos.cog) + ' · SOG ' + kn(p.pos.sog);
+        var tip = '<b translate="no">' + esc(p.name) + '</b> ' + nsBadge(p) + ' · ' + (online(p) ? 'online' : ago(p.pos.seen || p.at)) + '<br>COG ' + deg(p.pos.cog) + ' · SOG ' + kn(p.pos.sog);
         var ll = [p.pos.lat, p.pos.lon]; pts.push(ll);
         if (!markers[p.id]) added = markers[p.id] = L.marker(ll, { icon: icon, keyboard: false, title: p.name }).bindTooltip(tip, { permanent: true, direction: 'top', offset: [0, -10], className: 'pm-label fleet-label', interactive: true })
           .on('click', (function (pid) { return function (e) { L.DomEvent.stop(e); onTap(pid); }; })(p.id)).addTo(fm.map);
@@ -469,7 +469,7 @@
       if (mf && isFinite(mf.lat)) { var g = C.geo.greatCircle(mf.lat, mf.lon, p.pos.lat, p.pos.lon); rows.push(['From you', ui.num(g.distanceNM, g.distanceNM < 10 ? 2 : 1) + ' NM · ' + ui.bearing(g.initialBearing) + ' T']); }
       rows.push(['Position time', ago(p.pos.t || p.pos.seen || p.at)]);
     } else rows.push(['Position', 'Not shared']);
-    ui.sheet({ title: p.name, html: '<div class="fleet-sheet">' + (v ? '<div class="fs-art">' + MEIKO.vessel.side(v.type, v) + '</div>' : '') + ui.kv(rows) +
+    ui.sheet({ title: p.name, rawTitle: true, html: '<div class="fleet-sheet">' + (v ? '<div class="fs-art">' + MEIKO.vessel.side(v.type, v) + '</div>' : '') + ui.kv(rows) +
       '<div class="actions"><button class="btn btn-primary" data-chatnow>' + icon('i-chat') + 'Chat' + (st.unread[id] ? ' <span class="badge-n">' + st.unread[id] + '</span>' : '') + '</button>' +
       (p.pos && opts.onMap ? '<button class="btn btn-ghost" data-mapnow>' + icon('i-map') + 'Show on map</button>' : '') + '</div>' +
       '<div class="actions fs-mod"><button class="btn btn-ghost btn-sm" data-block>' + icon('i-x') + 'Block</button><a class="btn btn-ghost btn-sm" target="_blank" rel="noopener" href="' + reportURL(id, p.name) + '">' + icon('i-info') + 'Report</a></div>' +
@@ -593,7 +593,7 @@
         var dist = '';
         if (p.pos && st.fix) { var g = C.geo.greatCircle(st.fix.lat, st.fix.lon, p.pos.lat, p.pos.lon); dist = ui.num(g.distanceNM, g.distanceNM < 10 ? 2 : 1) + ' NM · ' + ui.bearing(g.initialBearing) + ' T'; }
         return '<div class="fleet-peer' + (online(p) ? '' : ' off') + '"><button type="button" class="fp-btn" data-peer="' + esc(p.id) + '">' +
-          '<span class="dot ' + (online(p) ? 'ok' : '') + '"></span><span class="fp-main"><b>' + esc(p.name) + ' ' + nsBadge(p) + (p.callsign ? ' <small>' + esc(p.callsign) + '</small>' : '') + '</b>' +
+          '<span class="dot ' + (online(p) ? 'ok' : '') + '"></span><span class="fp-main"><b><span translate="no">' + esc(p.name) + '</span> ' + nsBadge(p) + (p.callsign ? ' <small translate="no">' + esc(p.callsign) + '</small>' : '') + '</b>' +
           '<small>' + (p.pos ? 'COG ' + deg(p.pos.cog) + ' · SOG ' + kn(p.pos.sog) + (dist ? ' · ' + dist : '') : 'Position not shared') + '</small></span>' +
           '<small class="fp-seen">' + (p.left ? 'left · ' : '') + (online(p) ? 'online' : ago(p.at)) + '<br><span class="fp-id">ID ' + C.fleet.shortId(p.id) + '</span></small></button>' +
           '<button type="button" class="btn btn-ghost btn-sm fp-dm" data-dm="' + esc(p.id) + '" aria-label="Chat with ' + esc(p.name) + '">' + icon('i-chat') + 'Chat' + (st.unread[p.id] ? ' <span class="badge-n">' + st.unread[p.id] + '</span>' : '') + '</button></div>';

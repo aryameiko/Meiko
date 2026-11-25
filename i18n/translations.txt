@@ -1517,3 +1517,4 @@
 1515|Ini menghapus avatar dan nama kapal Anda dari perangkat ini.|Ini mengalih keluar avatar dan nama kapal anda daripada peranti ini.|Inaalis nito ang iyong vessel avatar at pangalan sa device na ito.|Thao tác này xóa hình đại diện và tên tàu khỏi thiết bị này.|การดำเนินการนี้จะลบอวาตาร์และชื่อเรือของคุณออกจากอุปกรณ์นี้|这将从此设备移除您的船只头像和名称。
 1516|Kapal dihapus|Kapal dialih keluar|Naalis ang sasakyang-dagat|Đã xóa tàu|ลบเรือแล้ว|船只已移除
 1517|dan|dan|at|và|และ|和
+1518|Tidak bisa menghapus data Anda di server. Periksa koneksi internet lalu coba lagi.|Tidak dapat memadam data anda di pelayan. Semak sambungan internet dan cuba lagi.|Hindi mabura ang iyong data sa server. Tingnan ang internet connection at subukang muli.|Không xóa được dữ liệu của bạn trên máy chủ. Kiểm tra kết nối internet rồi thử lại.|ลบข้อมูลของคุณบนเซิร์ฟเวอร์ไม่ได้ ตรวจสอบอินเทอร์เน็ตแล้วลองอีกครั้ง|无法删除服务器上的数据。请检查网络连接后重试。

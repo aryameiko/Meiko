@@ -42,7 +42,7 @@
     var bd = document.createElement('div');
     bd.className = 'sheet-backdrop';
     bd.innerHTML = '<div class="sheet" role="dialog" aria-modal="true" aria-label="' + esc(opts.title) + '">' +
-      '<div class="sheet-head"><h3>' + esc(opts.title) + '</h3><button class="icon-btn" data-close aria-label="Close">' + icon('i-x') + '</button></div>' +
+      '<div class="sheet-head"><h3' + (opts.rawTitle ? ' translate="no"' : '') + '>' + esc(opts.title) + '</h3><button class="icon-btn" data-close aria-label="Close">' + icon('i-x') + '</button></div>' +
       '<div class="sheet-body">' + (opts.html || '') + '</div></div>';
     document.body.appendChild(bd);
     var prevFocus = document.activeElement;

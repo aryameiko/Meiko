@@ -1516,3 +1516,4 @@ Remove vessel?
 This removes your vessel avatar and name from this device.
 Vessel removed
 and
+Could not delete your data on the server. Check the internet connection and try again.

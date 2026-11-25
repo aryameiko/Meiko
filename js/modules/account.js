@@ -24,7 +24,7 @@
       if (!box.isConnected) return;
       MEIKO.storage.remove('ownerNo');
       var by = {}, langs = {}, n = list.length;
-      list.forEach(function (u) { var c = u.country || '??'; by[c] = (by[c] || 0) + 1; var l = u.language || '?'; langs[l] = (langs[l] || 0) + 1; });
+      list.forEach(function (u) { var c = MEIKO.region.valid(u.country) ? u.country : '??'; by[c] = (by[c] || 0) + 1; var l = MEIKO.i18n.info(u.language) ? u.language : '?'; langs[l] = (langs[l] || 0) + 1; });
       var rows = Object.keys(by).sort(function (a, b) { return by[b] - by[a]; });
       var max = rows.length ? by[rows[0]] : 1;
       var lname = function (c) { var i = MEIKO.i18n.info(c); return i ? i.name : c; };

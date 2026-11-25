@@ -187,7 +187,8 @@
       var p = profile(); if (!p || !p.uid || active !== 'firebase') return Promise.resolve(null);
       return fsFetch('users/' + encodeURIComponent(p.uid), { method: 'GET' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
         var f = d && d.fields, c = f && f.country && f.country.stringValue, l = f && f.language && f.language.stringValue;
-        if (!c) return null;
+        if (!c || !MEIKO.region || !MEIKO.region.valid(c)) return null;
+        if (l && !(MEIKO.i18n && MEIKO.i18n.info(l))) l = '';
         save({ country: c, lang: l || p.lang || '', regionSynced: true });
         return { country: c, language: l };
       }).catch(function () { return null; });
@@ -258,7 +259,14 @@
   }
   function deleteRegionDoc() {
     var p = profile(); if (!p || !p.uid || active !== 'firebase') return Promise.resolve();
-    return fsFetch('users/' + encodeURIComponent(p.uid), { method: 'DELETE' }).then(function () {}, function () {});
+    // Must succeed (or the document must already be gone): otherwise the account would be deleted and the
+    // document left behind with no one able to remove it.
+    return fsFetch('users/' + encodeURIComponent(p.uid), { method: 'DELETE' }).then(function (r) {
+      if (!r.ok && r.status !== 404) throw new Error('Could not delete your data on the server. Check the internet connection and try again.');
+    }, function (e) {
+      if (e && (e.message === 'no-firebase' || e.message === 'signed-out')) return;
+      throw new Error('Could not delete your data on the server. Check the internet connection and try again.');
+    });
   }
   initFirebase();
   window.addEventListener('online', function () { syncRegion(); });
